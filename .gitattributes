@@ -1,0 +1,2 @@
+# Forcer les sauts de ligne de type LF pour tous les fichiers texte
+* text=auto eol=lf
