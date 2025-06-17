@@ -69,7 +69,7 @@ def get_date_today() -> str:
     return datetime.date.today().strftime("%Y-%m-%d")
 
 
-def get_training_plan(date: str) -> dict:
+def get_daily_achievement(date: str) -> dict:
     """
     Retrieves the daily training plan for a specified date.
 
@@ -95,21 +95,45 @@ def get_training_plan(date: str) -> dict:
     except requests.exceptions.RequestException as e:
         return {"status": "error", "error_message": f"Failed to retrieve training plan: {e}"}
 
+
+def get_training_template(template_id: str) -> dict:
+    """
+    Retrieves the training plan template for a specified template ID.
+
+    Args:
+        template_id (str): The ID of the training plan template.
+
+    :return: the training plan template organized by categories and drills, with the descriptions and the target number of repetitions to complete the drill.
+    """
+    coach_backend_url = os.getenv("COACH_BACKEND_URL")
+    if not coach_backend_url:
+        return {"status": "error", "error_message": "COACH_BACKEND_URL environment variable is not set."}
+
+    url = f"{coach_backend_url}/api/v1/plan-templates/{template_id}"
+
+    try:
+        response = requests.get(url)
+        response.raise_for_status()  # Raise an exception for bad status codes
+        return {"status": "success", "actionDone": "GET", "report": response.json()}
+    except requests.exceptions.RequestException as e:
+        return {"status": "error", "error_message": f"Failed to retrieve training template: {e}"}
+
+
 def update_training(plan: dict) -> dict:
     """
     Updates the daily training plan for today. The minimal JSON format is
     {
       "id": "<ID of the plan>",
       "date": "<DATE format YYYY-MM-DD>",
-      "categories": {
-        "<category ID>": {
-          "drills": {
-            "<drill ID>": {
-              "repetition": <value to update>
-            }
-            "<optional other drill ID and repetition>"
-          }
-        }
+      "repetitions": {
+        "<CATEGORY_ID>": {
+          "<DRILL_ID>": {
+            "repetition": <NUMBER_OF_REPETITIONS>,
+            "note": "<OPTIONAL_NOTE>"
+          },
+          ...
+        },
+        ...
       }
     }
     If a whole category must be updated, all the drills of the category can be added in the plan to update
@@ -172,7 +196,7 @@ root_agent = Agent(
     ),
     # instruction=get_prompt["exp"],
     instruction=get_prompt["working"],
-    tools=[get_training_plan, get_date_today,update_training],
+    tools=[get_daily_achievement, get_training_template, get_date_today, update_training],
 
 )
 

@@ -64,6 +64,12 @@
             font-weight: bold;
         }
 
+        .drill-desc {
+            font-size: 0.9em;
+            color: #333;
+            margin-top: 3px;
+        }
+
         .drill-controls {
             margin-top: 5px;
             display: flex;
@@ -80,6 +86,16 @@
             padding: 3px;
             margin: 0 5px;
             text-align: center;
+        }
+
+        /* NOUVEAU STYLE POUR L'INPUT DE NOTE */
+        .drill-note-input {
+            flex-grow: 1;
+            padding: 3px;
+            margin-left: 10px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            font-size: 0.9em;
         }
 
         .accordion-header .category-reps {
@@ -166,28 +182,12 @@
             margin-top: 5px; /* Ajoute un petit espace si vad-controls a une marge en bas */
         }
 
-        #chat-send-button, #chat-mic-button {
-            padding: 0; /* Remove padding to rely on width/height */
-            border: none;
-            border-radius: 50%;
-            cursor: pointer;
-            background-color: #007bff;
-            color: white;
-            margin-left: 5px;
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px; /* Adjust icon size */
-        }
-
-        #chat-mic-button.muted {
-            background-color: #6c757d; /* Grey when muted */
-        }
-
-        #chat-mic-button.recording {
-            background-color: #dc3545; /* Red when recording */
+        #chat-message-input {
+            flex-grow: 1; /* Allow input to take available space */
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 18px;
+            margin-right: 5px;
         }
 
         #chat-send-button, #chat-mic-button, #chat-delete-session-button { /* Ajout de #chat-delete-session-button */
@@ -204,7 +204,17 @@
             align-items: center;
             justify-content: center;
             font-size: 18px;
+            flex-shrink: 0; /* Prevent buttons from shrinking */
         }
+
+        #chat-mic-button.muted {
+            background-color: #6c757d; /* Grey when muted */
+        }
+
+        #chat-mic-button.recording {
+            background-color: #dc3545; /* Red when recording */
+        }
+
 
         #chat-delete-session-button { /* Style spécifique si besoin, par ex. couleur différente */
             background-color: #dc3545; /* Rouge pour une action de suppression */
@@ -230,7 +240,8 @@
     </div>
     <div id="chat-input-area">
         <div id="vad-controls" style="display: flex; flex-direction: column; margin-bottom: 5px; width: 100%;">
-            <label for="vad-threshold-slider" style="font-size: 0.8em; margin-bottom: 2px;">Seuil VAD:</label> <!-- Label simplifié -->
+            <label for="vad-threshold-slider" style="font-size: 0.8em; margin-bottom: 2px;">Seuil VAD:</label>
+            <!-- Label simplifié -->
             <div style="display: flex; align-items: center;">
                 <input type="range" id="vad-threshold-slider" min="1" max="80" step="1" value="15"
                        style="flex-grow: 1; margin-right: 5px;">
@@ -249,360 +260,604 @@
 </div>
 
 <script>
-    // Existing Training Plan JavaScript
-    const dateDisplay = document.getElementById('date-display');
-    const datePicker = document.getElementById('date-picker');
-    const prevDayButton = document.getElementById('prev-day');
-    const nextDayButton = document.getElementById('next-day');
-    const planContainer = document.getElementById('plan-container');
-    // For local testing. Removed for the deployment (see dockerfile)
-    const coachBackendURL = "http://localhost:8080"
-    const coachAgentURL = "http://localhost:8081"
+    document.addEventListener('DOMContentLoaded', () => {
+        // Existing Training Plan JavaScript
+        const dateDisplay = document.getElementById('date-display');
+        const datePicker = document.getElementById('date-picker');
+        const prevDayButton = document.getElementById('prev-day');
+        const nextDayButton = document.getElementById('next-day');
+        const planContainer = document.getElementById('plan-container');
+        // For local testing. Removed for the deployment (see dockerfile)
+        const coachBackendURL = "http://localhost:8080"
+        const coachAgentURL = "http://localhost:8081"
 
-    let currentDate = new Date();
-    let isToday = true;
+        let currentDate = new Date();
+        let isToday = true;
+        let currentPlanTemplate = null; // To store the plan structure (categories, drills)
+        let currentDailyPlanData = null; // To store daily achievements (repetitions, notes)
 
-    function formatDate(date) {
-        return date.toISOString().slice(0, 10);
-    }
+        function formatDate(date) {
+            return date.toISOString().slice(0, 10);
+        }
 
-    function updateDateDisplay() {
-        dateDisplay.textContent = formatDate(currentDate);
-        isToday = formatDate(currentDate) === formatDate(new Date());
-        planContainer.classList.toggle('read-only', !isToday);
-    }
+        function updateDateDisplay() {
+            dateDisplay.textContent = formatDate(currentDate);
+            isToday = formatDate(currentDate) === formatDate(new Date());
+            planContainer.classList.toggle('read-only', !isToday);
+        }
 
-    function loadPlan() {
-        const dateStr = formatDate(currentDate);
-        fetch(coachBackendURL + `/api/v1/daily-plans/${dateStr === formatDate(new Date()) ? 'today' : dateStr}`)
-            .then(response => {
+        async function loadPlanTemplate() {
+            if (currentPlanTemplate) {
+                return Promise.resolve(currentPlanTemplate);
+            }
+            try {
+                const response = await fetch(coachBackendURL + '/api/v1/plan-templates/default');
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(`Template fetch failed: ${response.statusText} (${errorData.error || 'Unknown error'})`);
+                }
+                currentPlanTemplate = await response.json();
+                return currentPlanTemplate;
+            } catch (error) {
+                console.error('Error loading plan template:', error);
+                planContainer.innerHTML = `<p>Error loading plan structure: ${error.message}</p>`;
+                throw error;
+            }
+        }
+
+        async function loadDailyPlanData(dateStr) {
+            const endpoint = `/api/v1/daily-plans/${dateStr === formatDate(new Date()) ? 'today' : dateStr}`;
+            try {
+                let response = await fetch(coachBackendURL + endpoint);
                 if (response.status === 404 && dateStr === formatDate(new Date())) {
-                    return fetch(coachBackendURL + '/api/v1/daily-plans/initiate', {method: 'POST'})
-                        .then(initResponse => initResponse.json());
-                }
-                return response.json();
-            })
-            .then(plan => {
-                if (plan && plan.categories) {
-                    displayPlan(plan);
+                    const initResponse = await fetch(coachBackendURL + '/api/v1/daily-plans/initiate', {method: 'POST'});
+                    if (!initResponse.ok) {
+                        const errorData = await initResponse.json().catch(() => ({}));
+                        throw new Error(`Failed to initiate plan: ${initResponse.statusText} (${errorData.error || 'Unknown error'})`);
+                    }
+                    currentDailyPlanData = await initResponse.json();
+                } else if (response.status === 404) { // Not found for a past date
+                    currentDailyPlanData = null; // No data exists, will display template with 0 reps
+                } else if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(`Failed to load daily plan: ${response.statusText} (${errorData.error || 'Plan not found'})`);
                 } else {
-                    planContainer.innerHTML = '<p>No plan found for this date.</p>';
+                    currentDailyPlanData = await response.json();
                 }
-            })
-            .catch(error => {
-                console.error('Error loading plan:', error);
-                planContainer.innerHTML = `<p>Error loading plan: ${error.message}</p>`;
-            });
-    }
-
-    function displayPlan(plan) {
-        planContainer.innerHTML = '';
-        for (const categoryId in plan.categories) {
-            const category = plan.categories[categoryId];
-            const categoryElement = document.createElement('div');
-            categoryElement.classList.add('accordion');
-            categoryElement.dataset.categoryId = categoryId;
-
-            const header = document.createElement('div');
-            header.classList.add('accordion-header');
-            header.innerHTML = `<h3>${category.name}</h3>`;
-
-            const categoryReps = document.createElement('span');
-            categoryReps.classList.add('category-reps');
-            header.appendChild(categoryReps);
-
-            const catButtons = document.createElement('div');
-            const catIncButton = document.createElement('button');
-            catIncButton.textContent = '+';
-            catIncButton.onclick = () => adjustCategoryReps(categoryId, 1);
-            const catDecButton = document.createElement('button');
-            catDecButton.textContent = '-';
-            catDecButton.onclick = () => adjustCategoryReps(categoryId, -1);
-            catButtons.append(catIncButton, catDecButton);
-            header.appendChild(catButtons)
-
-            categoryElement.appendChild(header);
-
-            const content = document.createElement('div');
-            content.classList.add('accordion-content', 'show');
-
-            let minReps = Infinity;
-
-            for (const drillId in category.drills) {
-                const drill = category.drills[drillId];
-                const drillElement = document.createElement('div');
-                drillElement.classList.add('drill');
-                drillElement.dataset.drillId = drillId;
-                drillElement.dataset.categoryId = categoryId;
-
-                const drillName = document.createElement('div');
-                drillName.classList.add('drill-name');
-                drillName.textContent = drill.name;
-                drillElement.appendChild(drillName);
-
-                const drillDesc = document.createElement('div');
-                drillDesc.classList.add('drill-desc');
-                drillDesc.textContent = drill.description;
-                drillElement.appendChild(drillDesc);
-
-                const drillControls = document.createElement('div');
-                drillControls.classList.add('drill-controls');
-                const decButton = document.createElement('button');
-                decButton.textContent = '-';
-                decButton.onclick = () => adjustDrillReps(categoryId, drillId, -1);
-
-                const incButton = document.createElement('button');
-                incButton.textContent = '+';
-                incButton.onclick = () => adjustDrillReps(categoryId, drillId, 1);
-
-                const repsDisplay = document.createElement('span');
-                repsDisplay.classList.add('drill-repetition');
-                repsDisplay.textContent = drill.repetition || 0;
-
-                drillControls.append(decButton, repsDisplay, incButton);
-                drillElement.appendChild(drillControls);
-                content.appendChild(drillElement);
-                minReps = Math.min(minReps, drill.repetition || 0);
-            }
-            categoryReps.textContent = `(Min Reps: ${minReps === Infinity ? 0 : minReps})`;
-            categoryElement.appendChild(content);
-            planContainer.appendChild(categoryElement);
-
-            header.addEventListener('click', () => {
-                content.classList.toggle('show');
-            });
-        }
-        updateDateDisplay(); // Ensure read-only state is applied after display
-    }
-
-    function adjustCategoryReps(categoryId, adjustment) {
-        const plan = getCurrentPlan();
-        if (!plan || !plan.categories[categoryId]) return;
-        const drillsToUpdate = [];
-        for (const drillId in plan.categories[categoryId].drills) {
-            const drill = plan.categories[categoryId].drills[drillId];
-            let newReps = (drill.repetition || 0) + adjustment;
-            if (newReps < 0) newReps = 0;
-            drillsToUpdate.push({categoryId, drillId, repetition: newReps});
-            drill.repetition = newReps;
-        }
-        saveMultipleDrillUpdates(drillsToUpdate);
-    }
-
-    function adjustDrillReps(categoryId, drillId, adjustment) {
-        const plan = getCurrentPlan();
-        if (!plan || !plan.categories[categoryId] || !plan.categories[categoryId].drills[drillId]) return;
-        const drill = plan.categories[categoryId].drills[drillId];
-        let newReps = (drill.repetition || 0) + adjustment;
-        if (newReps < 0) newReps = 0;
-        drill.repetition = newReps;
-        saveDrillUpdate(categoryId, drillId, newReps);
-    }
-
-    function saveDrillUpdate(categoryId, drillId, newReps) {
-        saveMultipleDrillUpdates([{categoryId, drillId, repetition: newReps}]);
-    }
-
-    function saveMultipleDrillUpdates(drillsToUpdate) {
-        if (!isToday || drillsToUpdate.length === 0) return;
-        const updates = {};
-        drillsToUpdate.forEach(({categoryId, drillId, repetition}) => {
-            if (!updates[categoryId]) updates[categoryId] = {drills: {}};
-            if (!updates[categoryId].drills[drillId]) updates[categoryId].drills[drillId] = {};
-            updates[categoryId].drills[drillId].repetition = repetition;
-        });
-
-        fetch(coachBackendURL + '/api/v1/daily-plans/today', {
-            method: 'PUT',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({categories: updates})
-        })
-            .then(response => response.json())
-            .then(updatedPlanFromServer => displayPlan(updatedPlanFromServer))
-            .catch(error => console.error('Error updating plan:', error));
-    }
-
-    function getCurrentPlan() {
-        const planElements = planContainer.querySelectorAll('.accordion');
-        if (planElements.length === 0) return null;
-        const plan = {categories: {}};
-        planElements.forEach(categoryElement => {
-            const categoryId = categoryElement.dataset.categoryId;
-            plan.categories[categoryId] = {drills: {}};
-            categoryElement.querySelectorAll('.drill').forEach(drillElement => {
-                const drillId = drillElement.dataset.drillId;
-                const repetition = parseInt(drillElement.querySelector('.drill-repetition').textContent);
-                plan.categories[categoryId].drills[drillId] = {repetition: repetition};
-            });
-        });
-        return plan;
-    }
-
-    dateDisplay.addEventListener('click', () => {
-        datePicker.style.display = 'block';
-        datePicker.value = formatDate(currentDate);
-        datePicker.focus();
-    });
-    datePicker.addEventListener('change', () => {
-        currentDate = new Date(datePicker.value);
-        datePicker.style.display = 'none';
-        updateDateDisplay();
-        loadPlan();
-    });
-    prevDayButton.addEventListener('click', () => {
-        currentDate.setDate(currentDate.getDate() - 1);
-        updateDateDisplay();
-        loadPlan();
-    });
-    nextDayButton.addEventListener('click', () => {
-        currentDate.setDate(currentDate.getDate() + 1);
-        updateDateDisplay();
-        loadPlan();
-    });
-
-    // Initial load for training plan
-    updateDateDisplay();
-    loadPlan();
-
-    // --- Chat Pane JavaScript ---
-    const chatHistory = document.getElementById('chat-history');
-    const chatMessageInput = document.getElementById('chat-message-input');
-    const chatSendButton = document.getElementById('chat-send-button');
-    const chatMicButton = document.getElementById('chat-mic-button');
-    const chatDeleteSessionButton = document.getElementById('chat-delete-session-button');
-    const vadThresholdSlider = document.getElementById('vad-threshold-slider');
-    const vadThresholdValueDisplay = document.getElementById('vad-threshold-value');
-    const micGainMeter = document.getElementById('mic-gain-meter');
-
-    let mediaRecorder;
-    let audioChunks = [];
-    let isMicMuted = true; // Start muted
-    let audioContext;
-    let analyser;
-    let microphoneStream;
-    let vadInterval;
-    const MIN_RECORDING_DURATION_MS = 300;
-    const VAD_CHECK_INTERVAL = 10;
-    let VAD_THRESHOLD = parseFloat(vadThresholdSlider.value); // Initialisez avec la valeur du slider
-    const SILENCE_DURATION_THRESHOLD = 500;
-    let silenceStartTime = 0;
-    let hasDetectedSpeechInSegment = false; // More specific name
-
-    vadThresholdSlider.addEventListener('input', () => {
-        VAD_THRESHOLD = parseFloat(vadThresholdSlider.value);
-        vadThresholdValueDisplay.textContent = VAD_THRESHOLD.toFixed(0);
-    });
-
-    function addMessageToChat(text, type = 'user', isAudio = false, audioBlobUrl = null) {
-        const messageElement = document.createElement('div');
-        messageElement.classList.add('chat-message', type);
-
-        if (isAudio && audioBlobUrl) {
-            messageElement.classList.add('audio');
-            const audioElement = document.createElement('audio');
-            audioElement.controls = true;
-            audioElement.src = audioBlobUrl;
-            messageElement.appendChild(audioElement);
-        } else {
-            messageElement.textContent = text;
-        }
-
-        chatHistory.appendChild(messageElement);
-        chatHistory.scrollTop = chatHistory.scrollHeight;
-        //Play audio automatically if type is not user
-        if (type !== 'user') {
-            const audioElement = messageElement.querySelector('audio');
-            if (audioElement) {
-                audioElement.play().catch(e => console.warn("Audio playback failed:", e));
+                return currentDailyPlanData;
+            } catch (error) {
+                console.error('Error loading daily plan data:', error);
+                planContainer.innerHTML = `<p>Error loading plan data: ${error.message}</p>`;
+                currentDailyPlanData = null;
+                throw error;
             }
         }
-    }
 
-    chatSendButton.addEventListener('click', () => {
-        const messageText = chatMessageInput.value.trim();
-        if (messageText) {
-            addMessageToChat(messageText, 'user');
-            chatMessageInput.value = '';
-            sendChatMessage(messageText, null); // Send text message
-        }
-    });
+        async function loadPlan() {
+            const dateStr = formatDate(currentDate);
+            planContainer.innerHTML = '<p>Loading plan...</p>';
+            updateDateDisplay(); // Update read-only status and date display early
 
-    chatMessageInput.addEventListener('keypress', (event) => {
-        if (event.key === 'Enter') {
-            chatSendButton.click();
-        }
-    });
+            try {
+                await loadPlanTemplate();
+                await loadDailyPlanData(dateStr);
 
-    async function setupMicrophone() {
-        try {
-            microphoneStream = await navigator.mediaDevices.getUserMedia({audio: true});
-            chatMicButton.classList.remove('muted');
-            chatMicButton.title = "Mute Microphone";
-            isMicMuted = false;
-            hasDetectedSpeechInSegment = false;
-            audioChunks = [];
-
-            mediaRecorder = new MediaRecorder(microphoneStream);
-            mediaRecorder.ondataavailable = event => {
-                if (event.data.size > 0) {
-                    audioChunks.push(event.data);
+                if (currentPlanTemplate) { // Always try to display template structure
+                    displayPlan(currentPlanTemplate, currentDailyPlanData);
+                } else {
+                    // Error message for template loading failure is already set by loadPlanTemplate
                 }
-            };
+            } catch (error) {
+                // Errors are logged by sub-functions, planContainer might have specific error messages.
+                console.error('Error in loadPlan orchestration:', error);
+                if (!planContainer.innerHTML.includes("Error") && !planContainer.innerHTML.includes("Loading")) {
+                    planContainer.innerHTML = `<p>An unexpected error occurred.</p>`;
+                }
+            }
+        }
 
-            // Dans la fonction setupMicrophone
-            mediaRecorder.onstop = async () => { // Rendre la fonction async
-                if (hasDetectedSpeechInSegment && audioChunks.length > 0) {
-                    const audioBlob = new Blob(audioChunks, {type: 'audio/webm'}); // ou 'audio/wav' selon ce que vous utilisez
+        function displayPlan(planTemplate, dailyPlanData) {
+            planContainer.innerHTML = '';
+            if (!planTemplate || !planTemplate.categories) {
+                planContainer.innerHTML = '<p>No plan structure (template) available to display.</p>';
+                return;
+            }
 
-                    // Déterminer la durée de l'audioBlob
-                    try {
-                        const tempAudioContext = new (window.AudioContext || window.webkitAudioContext)();
-                        const arrayBuffer = await audioBlob.arrayBuffer();
-                        const audioBuffer = await tempAudioContext.decodeAudioData(arrayBuffer);
-                        await tempAudioContext.close(); // Important de fermer le contexte temporaire
+            for (const categoryId in planTemplate.categories) {
+                const category = planTemplate.categories[categoryId];
+                const categoryElement = document.createElement('div');
+                categoryElement.classList.add('accordion');
+                categoryElement.dataset.categoryId = categoryId;
 
-                        const durationMs = audioBuffer.duration * 1000;
+                const header = document.createElement('div');
+                header.classList.add('accordion-header');
+                header.innerHTML = `<h3>${category.name}</h3>`;
 
-                        if (durationMs >= MIN_RECORDING_DURATION_MS) {
-                            const audioUrl = URL.createObjectURL(audioBlob);
-                            addMessageToChat(null, 'user', true, audioUrl);
-                            sendChatMessage(null, audioBlob);
-                            console.log(`Audio sent, duration: ${durationMs.toFixed(0)}ms`);
-                        } else {
-                            console.log(`Audio discarded, duration too short: ${durationMs.toFixed(0)}ms`);
-                            // Optionnel: informer l'utilisateur que l'audio était trop court
-                            // addMessageToChat("Audio too short, discarded.", "system-info");
+                const categoryRepsDisplay = document.createElement('span');
+                categoryRepsDisplay.classList.add('category-reps');
+                header.appendChild(categoryRepsDisplay);
+
+                const catButtons = document.createElement('div');
+                const catIncButton = document.createElement('button');
+                catIncButton.textContent = '+';
+                catIncButton.onclick = (e) => {
+                    e.stopPropagation();
+                    adjustCategoryReps(categoryId, 1);
+                };
+                const catDecButton = document.createElement('button');
+                catDecButton.textContent = '-';
+                catDecButton.onclick = (e) => {
+                    e.stopPropagation();
+                    adjustCategoryReps(categoryId, -1);
+                };
+                catButtons.append(catIncButton, catDecButton);
+                header.appendChild(catButtons);
+
+                categoryElement.appendChild(header);
+
+                const content = document.createElement('div');
+                content.classList.add('accordion-content', 'show'); // Default to show
+
+                let minRepsInCategory = Infinity;
+                let hasDrillsInCat = false;
+
+                if (category.drills) {
+                    for (const drillId in category.drills) {
+                        hasDrillsInCat = true;
+                        const drill = category.drills[drillId];
+                        const drillElement = document.createElement('div');
+                        drillElement.classList.add('drill');
+                        drillElement.dataset.drillId = drillId;
+                        drillElement.dataset.categoryId = categoryId;
+
+                        const drillName = document.createElement('div');
+                        drillName.classList.add('drill-name');
+                        drillName.textContent = drill.name;
+                        drillElement.appendChild(drillName);
+
+                        if (drill.description) {
+                            const drillDesc = document.createElement('div');
+                            drillDesc.classList.add('drill-desc');
+                            drillDesc.textContent = drill.description;
+                            drillElement.appendChild(drillDesc);
                         }
-                    } catch (e) {
-                        console.error("Error decoding audio or getting duration:", e);
-                        // En cas d'erreur de décodage, on pourrait choisir d'envoyer quand même
-                        // ou de le considérer comme invalide. Pour l'instant, on ne fait rien.
-                        const audioUrl = URL.createObjectURL(audioBlob); // Fallback: send it anyway or handle error
-                        addMessageToChat(null, 'user', true, audioUrl);
-                        sendChatMessage(null, audioBlob);
-                        addMessageToChat("Could not determine audio duration, sent anyway.", "system-warning");
+
+                        const drillControls = document.createElement('div');
+                        drillControls.classList.add('drill-controls');
+                        const decButton = document.createElement('button');
+                        decButton.textContent = '-';
+                        decButton.onclick = () => adjustDrillReps(categoryId, drillId, -1);
+
+                        const incButton = document.createElement('button');
+                        incButton.textContent = '+';
+                        incButton.onclick = () => adjustDrillReps(categoryId, drillId, 1);
+
+                        const repsDisplay = document.createElement('span');
+                        repsDisplay.classList.add('drill-repetition');
+
+                        let currentRepetition = 0;
+                        let currentNote = "";
+                        // dailyPlanData might be null if no plan exists for a past date
+                        if (dailyPlanData && dailyPlanData.repetitions &&
+                            dailyPlanData.repetitions[categoryId] &&
+                            dailyPlanData.repetitions[categoryId][drillId]) {
+                            const achievement = dailyPlanData.repetitions[categoryId][drillId];
+                            currentRepetition = achievement.repetition || 0;
+                            currentNote = achievement.note || "";
+                        }
+                        repsDisplay.textContent = currentRepetition;
+                        minRepsInCategory = Math.min(minRepsInCategory, currentRepetition);
+
+                        // CHAMP NOTE AJOUTÉ ICI
+                        const noteInput = document.createElement('input');
+                        noteInput.type = 'text';
+                        noteInput.classList.add('drill-note-input');
+                        noteInput.placeholder = 'Notes...';
+                        noteInput.value = currentNote;
+                        // Fin ajout champ note
+
+                        drillControls.append(decButton, repsDisplay, incButton, noteInput); // noteInput ajouté ici
+                        drillElement.appendChild(drillControls);
+                        content.appendChild(drillElement);
+                    }
+                }
+                categoryRepsDisplay.textContent = `(Min Reps: ${hasDrillsInCat && minRepsInCategory !== Infinity ? minRepsInCategory : 0})`;
+                categoryElement.appendChild(content);
+                planContainer.appendChild(categoryElement);
+
+                header.addEventListener('click', (e) => {
+                    // Prevent accordion toggle if a button inside header was clicked
+                    if (e.target.closest('button')) return;
+                    content.classList.toggle('show');
+                });
+            }
+            updateDateDisplay(); // Applies read-only if necessary
+        }
+
+        function ensureDailyPlanDataInitialized() {
+            if (!currentDailyPlanData) {
+                // Initialize a basic structure if today and no data (e.g., after initiation failed or for a new interaction)
+                if (isToday) {
+                    currentDailyPlanData = {
+                        id: `${formatDate(currentDate)}-temp`, // Temporary ID
+                        templateId: currentPlanTemplate?.id || "default",
+                        date: formatDate(currentDate),
+                        repetitions: {},
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString()
+                    };
+                } else {
+                    console.warn("Cannot modify: No existing daily plan data for this past date.");
+                    addMessageToChat("Cannot modify plan for a past date without existing data.", "system-warning");
+                    return false;
+                }
+            }
+            if (!currentDailyPlanData.repetitions) {
+                currentDailyPlanData.repetitions = {};
+            }
+            return true;
+        }
+
+
+        function adjustDrillReps(categoryId, drillId, adjustment) {
+            if (!currentPlanTemplate || !currentPlanTemplate.categories[categoryId]?.drills[drillId]) {
+                console.warn("Drill definition not found in template.");
+                return;
+            }
+            if (!isToday) { // Only allow edits for today
+                addMessageToChat("Modifications are only allowed for today's plan.", "system-info");
+                return;
+            }
+
+            if (!ensureDailyPlanDataInitialized()) return;
+
+
+            if (!currentDailyPlanData.repetitions[categoryId]) {
+                currentDailyPlanData.repetitions[categoryId] = {};
+            }
+            if (!currentDailyPlanData.repetitions[categoryId][drillId]) {
+                currentDailyPlanData.repetitions[categoryId][drillId] = {repetition: 0, note: ""};
+            }
+
+            let achievement = currentDailyPlanData.repetitions[categoryId][drillId];
+            let newReps = (achievement.repetition || 0) + adjustment;
+            if (newReps < 0) newReps = 0;
+
+            // Récupérer la note actuelle depuis le champ input dans le DOM
+            const drillElement = planContainer.querySelector(`.drill[data-category-id="${categoryId}"][data-drill-id="${drillId}"]`);
+            let noteFromInput = achievement.note; // Valeur par défaut
+            if (drillElement) {
+                const noteInputElement = drillElement.querySelector('.drill-note-input');
+                if (noteInputElement) {
+                    noteFromInput = noteInputElement.value;
+                }
+            }
+
+            achievement.repetition = newReps;
+            achievement.note = noteFromInput; // Mettre à jour la note dans les données locales
+
+            displayPlan(currentPlanTemplate, currentDailyPlanData); // Optimistic UI update (re-renders with new note)
+
+            saveDrillUpdate(categoryId, drillId, newReps, achievement.note); // Envoyer la note mise à jour
+        }
+
+        function adjustCategoryReps(categoryId, adjustment) {
+            if (!currentPlanTemplate || !currentPlanTemplate.categories[categoryId]?.drills) {
+                console.warn("Category or drills not found in template.");
+                return;
+            }
+            if (!isToday) {
+                addMessageToChat("Modifications are only allowed for today's plan.", "system-info");
+                return;
+            }
+
+            if (!ensureDailyPlanDataInitialized()) return;
+
+            const categoryDrills = currentPlanTemplate.categories[categoryId].drills;
+            const drillsToUpdate = {}; // Changé de [] à {} pour correspondre au payload attendu
+
+            if (!currentDailyPlanData.repetitions[categoryId]) {
+                currentDailyPlanData.repetitions[categoryId] = {};
+            }
+            // Initialiser drillsToUpdate[categoryId] si ce n'est pas déjà fait
+            if (!drillsToUpdate[categoryId]) {
+                drillsToUpdate[categoryId] = {};
+            }
+
+            for (const drillId in categoryDrills) {
+                if (!currentDailyPlanData.repetitions[categoryId][drillId]) {
+                    currentDailyPlanData.repetitions[categoryId][drillId] = {repetition: 0, note: ""};
+                }
+                let achievement = currentDailyPlanData.repetitions[categoryId][drillId];
+                let newReps = (achievement.repetition || 0) + adjustment;
+                if (newReps < 0) newReps = 0;
+
+                // Récupérer la note actuelle depuis le champ input dans le DOM pour ce drill
+                const drillElement = planContainer.querySelector(`.drill[data-category-id="${categoryId}"][data-drill-id="${drillId}"]`);
+                let noteFromInput = achievement.note; // Valeur par défaut
+                if (drillElement) {
+                    const noteInputElement = drillElement.querySelector('.drill-note-input');
+                    if (noteInputElement) {
+                        noteFromInput = noteInputElement.value;
                     }
                 }
 
-                audioChunks = []; // Toujours vider les chunks
-                hasDetectedSpeechInSegment = false; // Toujours réinitialiser
+                achievement.repetition = newReps; // Update local data
+                achievement.note = noteFromInput; // Update local note data
 
-                // Mettre à jour l'UI si le micro n'est pas muté entre-temps
-                if (!isMicMuted) {
-                    chatMicButton.classList.remove('recording');
-                    chatMicButton.title = "Mute Microphone";
+                // Prepare for backend update
+                drillsToUpdate[categoryId][drillId] = {repetition: newReps, note: achievement.note};
+            }
+
+            displayPlan(currentPlanTemplate, currentDailyPlanData); // Optimistic UI update
+
+            // Now, call a function to save all these updates to the backend
+            if (Object.keys(drillsToUpdate[categoryId]).length > 0) { // Vérifier s'il y a des drills à mettre à jour dans cette catégorie
+                // Le payload pour saveMultipleDrillUpdates attend un objet où les clés sont les categoryId
+                const payloadForBackend = { [categoryId]: drillsToUpdate[categoryId] };
+                saveMultipleDrillUpdates(payloadForBackend);
+            }
+        }
+
+        async function saveDrillUpdate(categoryId, drillId, newReps, note) {
+            if (!isToday) {
+                addMessageToChat("Modifications are only allowed for today's plan.", "system-info");
+                return;
+            }
+            if (!ensureDailyPlanDataInitialized()) return;
+
+
+            const payload = {
+                repetitions: {
+                    [categoryId]: {
+                        [drillId]: {
+                            repetition: newReps,
+                            note: note || "" // Ensure note is always a string
+                        }
+                    }
                 }
             };
 
-
-            // Ne pas démarrer MediaRecorder ici, VAD s'en chargera.
-
-            // AJOUT D'UNE TEMPORISATION AVANT DE DÉMARRER L'ANALYSE VAD
-            setTimeout(() => {
-                if (isMicMuted || !microphoneStream) {
-                    // Si entre-temps l'utilisateur a remué ou si le stream n'est plus valide
-                    return;
+            try {
+                const response = await fetch(coachBackendURL + '/api/v1/daily-plans/today', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(`Failed to save drill update: ${response.statusText} (${errorData.error || 'Unknown error'})`);
                 }
+                const updatedPlanFromServer = await response.json();
+                currentDailyPlanData = updatedPlanFromServer;
+                displayPlan(currentPlanTemplate, currentDailyPlanData); // Re-render with authoritative data
+                addMessageToChat("Plan updated successfully.", "system-success");
+
+            } catch (error) {
+                console.error('Error saving drill update:', error);
+                addMessageToChat(`Error saving update: ${error.message}`, 'system-error');
+            }
+        }
+
+        async function saveMultipleDrillUpdates(repetitionsPayload) {
+            // repetitionsPayload is expected to be like: { categoryId1: { drillId1: {repetition: X, note: Y}, ... }, ... }
+            if (!isToday || Object.keys(repetitionsPayload).length === 0) {
+                if (Object.keys(repetitionsPayload).length === 0) console.log("No updates to send for category adjustment.");
+                return;
+            }
+            if (!ensureDailyPlanDataInitialized()) return;
+
+
+            const payload = {
+                repetitions: repetitionsPayload
+            };
+
+            try {
+                const response = await fetch(coachBackendURL + '/api/v1/daily-plans/today', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(`Failed to save multiple drill updates: ${response.statusText} (${errorData.error || 'Unknown error'})`);
+                }
+                const updatedPlanFromServer = await response.json();
+                currentDailyPlanData = updatedPlanFromServer;
+                displayPlan(currentPlanTemplate, currentDailyPlanData);
+                addMessageToChat("Category repetitions updated successfully.", "system-success");
+
+            } catch (error) {
+                console.error('Error saving multiple drill updates:', error);
+                addMessageToChat(`Error saving category update: ${error.message}`, 'system-error');
+            }
+        }
+
+        // Event listeners for date controls
+        dateDisplay.addEventListener('click', () => {
+            datePicker.style.display = 'block';
+            datePicker.value = formatDate(currentDate);
+            datePicker.focus();
+        });
+
+        datePicker.addEventListener('blur', () => {
+            setTimeout(() => {
+                if (document.activeElement !== datePicker) {
+                    datePicker.style.display = 'none';
+                }
+            }, 100);
+        });
+
+        datePicker.addEventListener('change', () => {
+            currentDate = new Date(datePicker.value + 'T00:00:00');
+            datePicker.style.display = 'none';
+            loadPlan();
+        });
+
+        prevDayButton.addEventListener('click', () => {
+            currentDate.setDate(currentDate.getDate() - 1);
+            loadPlan();
+        });
+
+        nextDayButton.addEventListener('click', () => {
+            currentDate.setDate(currentDate.getDate() + 1);
+            loadPlan();
+        });
+
+        // Initial load for training plan
+        loadPlan();
+
+        // --- Chat Pane JavaScript ---
+        const chatHistory = document.getElementById('chat-history');
+        const chatMessageInput = document.getElementById('chat-message-input');
+        const chatSendButton = document.getElementById('chat-send-button');
+        const chatMicButton = document.getElementById('chat-mic-button');
+        const chatDeleteSessionButton = document.getElementById('chat-delete-session-button');
+        const vadThresholdSlider = document.getElementById('vad-threshold-slider');
+        const vadThresholdValueDisplay = document.getElementById('vad-threshold-value');
+        const micGainMeter = document.getElementById('mic-gain-meter');
+
+        let mediaRecorder;
+        let audioChunks = [];
+        let isMicMuted = true; // Start muted
+        let audioContext;
+        let analyser;
+        let microphoneStream;
+        let vadInterval;
+        const MIN_RECORDING_DURATION_MS = 300;
+        const VAD_CHECK_INTERVAL = 100;
+        let VAD_THRESHOLD = parseFloat(vadThresholdSlider.value);
+        const SILENCE_DURATION_THRESHOLD = 500;
+        let silenceStartTime = 0;
+        let hasDetectedSpeechInSegment = false;
+
+        vadThresholdSlider.addEventListener('input', () => {
+            VAD_THRESHOLD = parseFloat(vadThresholdSlider.value);
+            vadThresholdValueDisplay.textContent = VAD_THRESHOLD.toFixed(0);
+        });
+
+        function addMessageToChat(text, type = 'user', isAudio = false, audioBlobUrl = null) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('chat-message', type);
+
+            if (type === 'system-error') messageElement.style.color = 'red';
+            if (type === 'system-success') messageElement.style.color = 'green';
+            if (type === 'system-info') messageElement.style.color = 'blue';
+
+
+            if (isAudio && audioBlobUrl) {
+                messageElement.classList.add('audio');
+                const audioElement = document.createElement('audio');
+                audioElement.controls = true;
+                audioElement.src = audioBlobUrl;
+                messageElement.appendChild(audioElement);
+            } else {
+                messageElement.textContent = text;
+            }
+
+            chatHistory.appendChild(messageElement);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+
+            if (type !== 'user' && type !== 'received') {
+                const audioElement = messageElement.querySelector('audio');
+                if (audioElement) {
+                    // Autoplay for system responses with audio might be desired or not.
+                }
+            } else if (type === 'received') { // Agent's response
+                const audioElement = messageElement.querySelector('audio');
+                if (audioElement) {
+                    audioElement.play().catch(e => console.warn("Audio playback failed for received message:", e));
+                }
+            }
+        }
+
+        chatSendButton.addEventListener('click', () => {
+            const messageText = chatMessageInput.value.trim();
+            if (messageText) {
+                addMessageToChat(messageText, 'user');
+                chatMessageInput.value = '';
+                sendChatMessage({text: messageText});
+            }
+        });
+
+        chatMessageInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                chatSendButton.click();
+            }
+        });
+
+        async function setupMicrophone() {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                addMessageToChat("getUserMedia not supported on your browser!", "system-error");
+                return;
+            }
+            try {
+                microphoneStream = await navigator.mediaDevices.getUserMedia({audio: true});
+                isMicMuted = false;
+                chatMicButton.classList.remove('muted');
+                chatMicButton.title = "Mute Microphone (Currently Unmuted)";
+
+                hasDetectedSpeechInSegment = false;
+                audioChunks = [];
+
+                mediaRecorder = new MediaRecorder(microphoneStream);
+                mediaRecorder.ondataavailable = event => {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = async () => {
+                    chatMicButton.classList.remove('recording');
+                    chatMicButton.title = isMicMuted ? "Toggle Microphone (Currently Muted)" : "Mute Microphone (Currently Unmuted)";
+
+                    if (hasDetectedSpeechInSegment && audioChunks.length > 0) {
+                        const audioBlob = new Blob(audioChunks, {type: 'audio/webm;codecs=opus'});
+                        audioChunks = [];
+                        hasDetectedSpeechInSegment = false;
+
+                        try {
+                            const tempAudio = document.createElement('audio');
+                            const tempUrl = URL.createObjectURL(audioBlob);
+                            tempAudio.src = tempUrl;
+                            tempAudio.onloadedmetadata = () => {
+                                URL.revokeObjectURL(tempUrl);
+                                if (tempAudio.duration * 1000 >= MIN_RECORDING_DURATION_MS) {
+                                    const audioUrlForDisplay = URL.createObjectURL(audioBlob);
+                                    addMessageToChat(null, 'user', true, audioUrlForDisplay);
+                                    sendChatMessage({audioBlob: audioBlob});
+                                    console.log(`Audio sent, duration: ${(tempAudio.duration * 1000).toFixed(0)}ms`);
+                                } else {
+                                    console.log(`Audio discarded, duration too short: ${(tempAudio.duration * 1000).toFixed(0)}ms`);
+                                    addMessageToChat("Recording too short, discarded.", "system-info");
+                                }
+                            };
+                            tempAudio.onerror = () => {
+                                URL.revokeObjectURL(tempUrl);
+                                console.warn("Could not determine audio duration, sending anyway.");
+                                const audioUrlForDisplay = URL.createObjectURL(audioBlob);
+                                addMessageToChat(null, 'user', true, audioUrlForDisplay);
+                                sendChatMessage({audioBlob: audioBlob});
+                            };
+                        } catch (e) {
+                            console.error("Error in audio duration check or sending:", e);
+                            const audioUrlForDisplay = URL.createObjectURL(audioBlob);
+                            addMessageToChat(null, 'user', true, audioUrlForDisplay);
+                            sendChatMessage({audioBlob: audioBlob});
+                        }
+                    } else {
+                        console.log("No speech detected or audio chunks empty, not sending.");
+                        if (audioChunks.length > 0) audioChunks = [];
+                        hasDetectedSpeechInSegment = false;
+                    }
+
+                    if (isMicMuted && vadInterval) {
+                        clearInterval(vadInterval);
+                        vadInterval = null;
+                        if (audioContext && audioContext.state !== 'closed') audioContext.close();
+                    }
+                };
 
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 analyser = audioContext.createAnalyser();
@@ -611,18 +866,15 @@
                 analyser.fftSize = 512;
                 const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
-                if (vadInterval) clearInterval(vadInterval); // S'assurer qu'il n'y a pas d'intervalle précédent actif
+                if (vadInterval) clearInterval(vadInterval);
 
                 vadInterval = setInterval(() => {
-                    if (isMicMuted) {
-                        if (mediaRecorder && mediaRecorder.state === "recording") {
-                            mediaRecorder.stop();
-                        }
+                    if (isMicMuted || !mediaRecorder || !analyser) {
                         micGainMeter.value = 0;
-                        return;
-                    }
-                    if (!mediaRecorder || !analyser) {
-                        micGainMeter.value = 0;
+                        if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop();
+                        if (vadInterval) clearInterval(vadInterval);
+                        vadInterval = null;
+                        if (audioContext && audioContext.state !== 'closed') audioContext.close();
                         return;
                     }
 
@@ -638,9 +890,9 @@
                         if (mediaRecorder.state === "inactive") {
                             audioChunks = [];
                             mediaRecorder.start(VAD_CHECK_INTERVAL);
-                            hasDetectedSpeechInSegment = true;
                             chatMicButton.classList.add('recording');
-                            chatMicButton.title = "Recording...";
+                            chatMicButton.title = "Recording... (Click to Mute)";
+                            hasDetectedSpeechInSegment = true;
                         }
                         silenceStartTime = 0;
                     } else {
@@ -654,193 +906,169 @@
                         }
                     }
                 }, VAD_CHECK_INTERVAL);
-            }, 2500); // Temporisation de 150ms (ajustez si besoin)
 
-        } catch (err) {
-            console.error("Error accessing microphone:", err);
-            addMessageToChat("Microphone access denied or error.", "system-error");
-            isMicMuted = true;
-            chatMicButton.classList.add('muted');
-            chatMicButton.textContent = '🎤';
-            chatMicButton.title = "Microphone Disabled";
-            stopMicrophoneInternals(true);
-        }
-    }
-
-    function stopMicrophoneInternals(isError = false) {
-        if (microphoneStream) {
-            microphoneStream.getTracks().forEach(track => track.stop());
-            microphoneStream = null;
-        }
-
-        if (mediaRecorder) {
-            // If it's not an error and recorder is active, let onstop handle the final chunks.
-            // Otherwise, if it's an error, we just want to stop it without processing.
-            if (!isError && mediaRecorder.state === "recording") {
-                // The onstop handler should take care of processing the last segment
-                mediaRecorder.stop();
-            } else if (mediaRecorder.state !== "inactive") {
-                mediaRecorder.onstop = null; // Prevent onstop if we are force stopping due to error
-                mediaRecorder.stop();
+            } catch (err) {
+                console.error("Error accessing microphone:", err);
+                addMessageToChat(`Microphone access error: ${err.message}`, "system-error");
+                stopMicrophone(true);
             }
         }
-        mediaRecorder = null;
 
-        if (audioContext) {
-            audioContext.close().catch(e => console.warn("Error closing audio context:", e));
-            audioContext = null;
+        function stopMicrophone(isError = false) {
+            isMicMuted = true;
+
+            if (mediaRecorder && mediaRecorder.state === "recording") {
+                mediaRecorder.stop();
+            }
+            mediaRecorder = null;
+
+
+            if (microphoneStream) {
+                microphoneStream.getTracks().forEach(track => track.stop());
+                microphoneStream = null;
+            }
+
+            if (vadInterval) {
+                clearInterval(vadInterval);
+                vadInterval = null;
+            }
+            if (audioContext && audioContext.state !== 'closed') {
+                audioContext.close().catch(e => console.warn("Error closing audio context:", e));
+                audioContext = null;
+            }
+
+            analyser = null;
+            audioChunks = [];
+            hasDetectedSpeechInSegment = false;
+            silenceStartTime = 0;
+            micGainMeter.value = 0;
+
+            chatMicButton.classList.add('muted');
+            chatMicButton.classList.remove('recording');
+            chatMicButton.title = "Toggle Microphone (Currently Muted)";
         }
-        if (vadInterval) {
-            clearInterval(vadInterval);
-            vadInterval = null;
-        }
 
-        hasDetectedSpeechInSegment = false;
-        audioChunks = [];
-        silenceStartTime = 0;
-    }
+        chatMicButton.addEventListener('click', () => {
+            if (isMicMuted) {
+                setupMicrophone();
+            } else {
+                stopMicrophone();
+            }
+        });
 
+        stopMicrophone();
 
-    function stopMicrophone() {
-        // This function is called when the user clicks the mute button
-        isMicMuted = true; // Set muted state first
-        stopMicrophoneInternals(false); // Not an error state, allow onstop to process final segment if recording
+        async function sendChatMessage({text, audioBlob}) {
+            let payload = {};
+            let hasContent = false;
 
-        // Update UI
-        chatMicButton.classList.add('muted');
-        chatMicButton.classList.remove('recording');
-        chatMicButton.textContent = '🎤';
-        chatMicButton.title = "Toggle Microphone";
-    }
+            if (text) {
+                payload.text = text;
+                hasContent = true;
+            }
 
-    chatMicButton.addEventListener('click', () => {
-        if (isMicMuted) {
-            setupMicrophone();
-        } else {
-            stopMicrophone(); // This will set isMicMuted = true and call stopMicrophoneInternals
-        }
-    });
+            if (audioBlob) {
+                try {
+                    const base64Data = await blobToBase64(audioBlob);
+                    payload.inlineData = {
+                        mimeType: audioBlob.type || 'audio/webm',
+                        data: base64Data
+                    };
+                    hasContent = true;
+                } catch (error) {
+                    console.error('Error converting blob to base64:', error);
+                    addMessageToChat("Error processing audio for sending.", 'system-error');
+                    return;
+                }
+            }
 
-    // Initial state for mic button
-    chatMicButton.classList.add('muted');
-    chatMicButton.textContent = '🎤';
-    vadThresholdValueDisplay.textContent = VAD_THRESHOLD.toFixed(0);
+            if (!hasContent) {
+                console.log("No content to send in chat message.");
+                return;
+            }
 
-
-    function sendChatMessage(messageText, audioBlob) {
-        let payload = {};
-        if (messageText) {
-            payload.text = messageText;
-        }
-        if (audioBlob) {
-            const reader = new FileReader();
-            reader.onloadend = function () {
-                const base64Data = reader.result.split(',')[1];
-                payload.inlineData = {
-                    mimeType: audioBlob.type,
-                    data: base64Data
-                };
-                fetch(coachAgentURL + '/api/v1/chat', {
+            try {
+                const response = await fetch(coachAgentURL + '/api/v1/chat', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify(payload)
-                })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status === 'success') {
-                            if (data.part.text) {
-                                addMessageToChat(data.part.text, 'received');
-                            }
-                            if (data.part.inlineData) {
-                                const audioUrl = "data:" + data.part.inlineData.mimeType + ";base64," + data.part.inlineData.data;
-                                addMessageToChat(null, 'received', true, audioUrl);
-                            }
-                            // Vérifier l'action et rafraîchir le plan si nécessaire
-                            if (data.action === "PUT") {
-                                loadPlan(); // Appelle la fonction pour recharger le plan
-                            }
-                        } else if (data.error) {
-                            addMessageToChat("Error: " + data.error, 'system-error');
-                        } else {
-                            addMessageToChat("Unknown error communicating with the server.", 'system-error');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error sending chat message:', error);
-                        addMessageToChat("Error sending message to the server.", 'system-error');
-                    });
-            };
-            reader.readAsDataURL(audioBlob);
-        } else {
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Server error: ${response.status} ${errorText}`);
+                }
+
+                const data = await response.json();
+
+                if (data.status === 'success' && data.part) {
+                    if (data.part.text) {
+                        addMessageToChat(data.part.text, 'received');
+                    }
+                    if (data.part.inlineData && data.part.inlineData.data) {
+                        const audioUrl = `data:${data.part.inlineData.mimeType};base64,${data.part.inlineData.data}`;
+                        addMessageToChat(null, 'received', true, audioUrl);
+                    }
+                    if (data.action === "PUT" || data.action === "UPDATE_PLAN") {
+                        addMessageToChat("Agent updated the plan. Reloading...", "system-info");
+                        await loadPlan();
+                    } else if (data.action === "REFRESH_DAILY_DATA") {
+                        addMessageToChat("Agent updated daily values. Refreshing...", "system-info");
+                        await loadDailyPlanData(formatDate(currentDate));
+                        displayPlan(currentPlanTemplate, currentDailyPlanData);
+                    }
+
+                } else if (data.error) {
+                    addMessageToChat(`Agent error: ${data.error}`, 'system-error');
+                } else {
+                    addMessageToChat("Received an unexpected response from the agent.", 'system-error');
+                }
+            } catch (error) {
+                console.error('Error sending/receiving chat message:', error);
+                addMessageToChat(`Network or server error: ${error.message}`, 'system-error');
+            }
+        }
+
+        function blobToBase64(blob) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    const base64String = reader.result.split(',')[1];
+                    resolve(base64String);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+        }
+
+
+        chatDeleteSessionButton.addEventListener('click', () => {
+            if (!confirm("Are you sure you want to delete the session and clear chat history?")) {
+                return;
+            }
+
             fetch(coachAgentURL + '/api/v1/chat', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(payload)
+                method: 'DELETE',
             })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        if (data.part.text) {
-                            addMessageToChat(data.part.text, 'received');
-                        }
-                        if (data.part.inlineData) {
-                            const audioUrl = "data:" + data.part.inlineData.mimeType + ";base64," + data.part.inlineData.data;
-                            addMessageToChat(null, 'received', true, audioUrl);
-                        }
-                        // Vérifier l'action et rafraîchir le plan si nécessaire
-                        if (data.action === "PUT") {
-                            loadPlan(); // Appelle la fonction pour recharger le plan
-                        }
-                    } else if (data.error) {
-                        addMessageToChat("Error: " + data.error, 'system-error');
+                .then(response => {
+                    if (response.ok) {
+                        chatHistory.innerHTML = '';
+                        addMessageToChat("Session and history cleared.", 'system-info');
+                        console.log("Chat session deleted successfully.");
                     } else {
-                        addMessageToChat("Unknown error communicating with the server.", 'system-error');
+                        response.text().then(text => {
+                            addMessageToChat(`Error deleting session: ${response.status} ${text || ''}`, 'system-error');
+                            console.error('Error deleting session:', response.status, text);
+                        });
                     }
                 })
                 .catch(error => {
-                    console.error('Error sending chat message:', error);
-                    addMessageToChat("Error sending message to the server.", 'system-error');
+                    addMessageToChat("Network error while deleting session.", 'system-error');
+                    console.error('Network error deleting session:', error);
                 });
-        }
-    }
+        });
 
-    chatDeleteSessionButton.addEventListener('click', () => {
-        // Optionnel : Demander une confirmation à l'utilisateur
-        if (!confirm("Êtes-vous sûr de vouloir supprimer la session et effacer l'historique du chat ?")) {
-            return;
-        }
-
-        fetch(coachAgentURL + '/api/v1/chat', {
-            method: 'DELETE',
-            headers: {
-                // Ajoutez des headers si votre backend en a besoin pour l'authentification,
-                // par exemple 'X-User-Email' si vous l'utilisez comme dans votre backend Go.
-                // 'Content-Type': 'application/json' // Pas typiquement nécessaire pour un DELETE sans corps
-            }
-        })
-            .then(response => {
-                if (response.ok) { // Vérifie si le statut est 2xx (par exemple 200 OK ou 204 No Content)
-                    chatHistory.innerHTML = ''; // Efface tous les messages du chat
-                    addMessageToChat("Session et historique effacés.", 'system-info'); // Message de confirmation
-                    console.log("Session deleted successfully.");
-                } else {
-                    // Gérer les erreurs si la suppression échoue
-                    response.text().then(text => { // Essayer de lire le corps de la réponse en cas d'erreur
-                        addMessageToChat(`Erreur lors de la suppression de la session: ${response.status} ${text}`, 'system-error');
-                        console.error('Error deleting session:', response.status, text);
-                    });
-                }
-            })
-            .catch(error => {
-                addMessageToChat("Erreur réseau lors de la suppression de la session.", 'system-error');
-                console.error('Network error deleting session:', error);
-            });
-    });
-
+    }); // End of DOMContentLoaded
 </script>
 </body>
 </html>
