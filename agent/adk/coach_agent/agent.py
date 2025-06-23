@@ -91,7 +91,7 @@ def get_daily_achievement(date: str) -> dict:
         # Follow the redirect
         response = requests.get(url, allow_redirects=True)
         response.raise_for_status()  # Raise an exception for bad status codes
-        return {"status": "success", "actionDone": "GET", "report": response.json()}
+        return {"status": "success", "report": response.json()}
     except requests.exceptions.RequestException as e:
         return {"status": "error", "error_message": f"Failed to retrieve training plan: {e}"}
 
@@ -114,7 +114,7 @@ def get_training_template(template_id: str) -> dict:
     try:
         response = requests.get(url)
         response.raise_for_status()  # Raise an exception for bad status codes
-        return {"status": "success", "actionDone": "GET", "report": response.json()}
+        return {"status": "success","report": response.json()}
     except requests.exceptions.RequestException as e:
         return {"status": "error", "error_message": f"Failed to retrieve training template: {e}"}
 
@@ -177,7 +177,7 @@ def update_training(plan: dict) -> dict:
             else:
                 # Pas une redirection que nous gérons, ou pas de redirection du tout
                 response.raise_for_status()  # Lève une exception pour les codes d'erreur HTTP
-                return {"status": "success", "actionDone": "PUT", "report": response.json()}
+                return {"status": "success", "report": response.json()}
 
         # Si la boucle se termine sans retourner (ne devrait pas arriver avec la logique ci-dessus)
         return {"status": "error", "error_message": "Redirect handling failed unexpectedly."}

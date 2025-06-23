@@ -64,3 +64,15 @@ curl -X POST http://localhost:8000/run \
     }]
 }
 }"
+
+
+store_unfiltered_order_calendar
+store_unfiltered_unified_order_calendar
+z_prolog_order_picking_delivery_line
+internal_rao_sales_forecast
+fv_prolog_order_lines
+logistic_replenishment_proposal
+store_order_calendar
+store_order_schedule
+internal_rao_assortment
+logistic_replenishment_proposal_historica

@@ -62,8 +62,10 @@ gcloud beta run deploy coach-agent-wrapper \
   --set-env-vars=COACH_AGENT_LOCAL_PORT=8000,COACH_AGENT_NAME=coach_agent \
   --depends-on=adk \
   --container adk \
+  --memory 512Mi \
+  --cpu 2 \
   --image gcr.io/${projectId}/coach-agent:latest \
-  --startup-probe=httpGet.path=/list-apps,httpGet.port=8000 \
+  --startup-probe=httpGet.path=/list-apps,httpGet.port=8000,timeoutSeconds=10,periodSeconds=10,failureThreshold=3,initialDelaySeconds=5 \
   --set-env-vars=GOOGLE_GENAI_USE_VERTEXAI=TRUE,GOOGLE_CLOUD_PROJECT=${projectId},GOOGLE_CLOUD_LOCATION=europe-west1,COACH_BACKEND_URL=http://coach-backend-${projectNumber}.europe-west1.run.app
 
 # Deploy the frontend service

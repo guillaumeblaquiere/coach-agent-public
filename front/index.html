@@ -594,7 +594,7 @@
             // Now, call a function to save all these updates to the backend
             if (Object.keys(drillsToUpdate[categoryId]).length > 0) { // Vérifier s'il y a des drills à mettre à jour dans cette catégorie
                 // Le payload pour saveMultipleDrillUpdates attend un objet où les clés sont les categoryId
-                const payloadForBackend = { [categoryId]: drillsToUpdate[categoryId] };
+                const payloadForBackend = {[categoryId]: drillsToUpdate[categoryId]};
                 saveMultipleDrillUpdates(payloadForBackend);
             }
         }
@@ -621,7 +621,10 @@
             try {
                 const response = await fetch(coachBackendURL + '/api/v1/daily-plans/today', {
                     method: 'PUT',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-User-Email': userEmail
+                    },
                     body: JSON.stringify(payload)
                 });
                 if (!response.ok) {
@@ -655,7 +658,8 @@
             try {
                 const response = await fetch(coachBackendURL + '/api/v1/daily-plans/today', {
                     method: 'PUT',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: {'Content-Type': 'application/json',
+                    'X-User-Email': userEmail},
                     body: JSON.stringify(payload)
                 });
                 if (!response.ok) {
@@ -1009,10 +1013,7 @@
                         const audioUrl = `data:${data.part.inlineData.mimeType};base64,${data.part.inlineData.data}`;
                         addMessageToChat(null, 'received', true, audioUrl);
                     }
-                    if (data.action === "PUT" || data.action === "UPDATE_PLAN") {
-                        addMessageToChat("Agent updated the plan. Reloading...", "system-info");
-                        await loadPlan();
-                    } else if (data.action === "REFRESH_DAILY_DATA") {
+                    if (data.action === "REFRESH_DAILY_DATA") {
                         addMessageToChat("Agent updated daily values. Refreshing...", "system-info");
                         await loadDailyPlanData(formatDate(currentDate));
                         displayPlan(currentPlanTemplate, currentDailyPlanData);
@@ -1068,7 +1069,54 @@
                 });
         });
 
-    }); // End of DOMContentLoaded
+        const userEmail = "guillaume.blaquiere@gmail.com"
+        let ws;
+
+        function connectWebSocket() {
+            // Construire l'URL du WebSocket
+            const wsURL = `${coachBackendURL.replace('http', 'ws')}/api/v1/ws?email=${encodeURIComponent(userEmail)}`;
+            console.log("Connecting to WebSocket:", wsURL);
+
+            ws = new WebSocket(wsURL);
+
+            ws.onopen = () => {
+                console.log("WebSocket connection established.");
+                addMessageToChat("Real-time connection active.", "system-success");
+            };
+
+            ws.onmessage = (event) => {
+                console.log("WebSocket message received:", event.data);
+                try {
+                    const message = JSON.parse(event.data);
+
+                    if (message.action === 'PLAN_UPDATED') {
+                        addMessageToChat("Your plan has been updated in real-time!", "system-info");
+
+                        currentDailyPlanData = message.data;
+
+                        if (currentPlanTemplate) {
+                            displayPlan(currentPlanTemplate, currentDailyPlanData);
+                        }
+                    }
+                } catch (error) {
+                    console.error("Error parsing WebSocket message:", error);
+                }
+            };
+
+            ws.onclose = (event) => {
+                console.log("WebSocket connection closed.", event);
+                addMessageToChat("Real-time connection lost. Attempting to reconnect...", "system-error");
+                setTimeout(connectWebSocket, 5000);
+            };
+
+            ws.onerror = (error) => {
+                console.error("WebSocket error:", error);
+                addMessageToChat("A real-time connection error occurred.", "system-error");
+            };
+        }
+        connectWebSocket()
+    })
+        // End of DOMContentLoaded
 </script>
 </body>
 </html>

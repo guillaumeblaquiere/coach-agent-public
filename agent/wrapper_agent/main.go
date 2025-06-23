@@ -14,7 +14,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -339,24 +338,14 @@ func AskAgent(user string, sessionID string, req WrapperRequest) (wrapperRespons
 
 	// Extract the text from the ADK response
 	var responseJson strings.Builder
-	var actionDones []string
 	if adkResp != nil && len(adkResp) > 0 {
 		for _, respPart := range adkResp {
 			if respPart.Content.Parts != nil && len(respPart.Content.Parts) > 0 {
 				if respPart.Content.Parts[0].Text != "" {
 					responseJson.WriteString(respPart.Content.Parts[0].Text)
 				}
-				if respPart.Content.Parts[0].FunctionResponse != nil {
-					actionDone := respPart.Content.Parts[0].FunctionResponse.Response["actionDone"]
-					actionDones = append(actionDones, fmt.Sprintf("%v", actionDone))
-				}
 			}
 		}
-	}
-
-	actionDone := "GET"
-	if slices.Contains(actionDones, "PUT") {
-		actionDone = "PUT"
 	}
 
 	// Create the wrapper response
@@ -365,7 +354,6 @@ func AskAgent(user string, sessionID string, req WrapperRequest) (wrapperRespons
 		Part: Part{
 			Text: responseJson.String(),
 		},
-		Action: actionDone,
 	}
 
 	//fmt.Printf("wrapperResponse is: %+v\n", wrapperResponse.Part.Text)
@@ -436,7 +424,6 @@ type WrapperRequest Part
 type WrapperResponse struct {
 	Part   Part   `json:"part"`
 	Status string `json:"status"`
-	Action string `json:"action"`
 	Error  string `json:"error,omitempty"`
 }
 

@@ -32,5 +32,3 @@ Pour cela, récupère la date du jour avec le tool "get_date_today" et ensuite r
 Ton but est d'être motivant en faisant ressortir les succès du passé.
         """,
 }
-
-
