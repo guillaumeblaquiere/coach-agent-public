@@ -1,3 +1,5 @@
+// C:/Users/Guillou/IdeaProjects/coach/coach/handlers.go
+
 package main
 
 import (
@@ -5,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -30,16 +33,50 @@ var (
 
 // API provides application-wide context, like the Firestore client.
 type API struct {
-	fsClient *firestore.Client
+	fsClient    *firestore.Client
+	connManager *ConnectionManager
 	// logger *log.Logger // Recommended for production
 }
 
 // NewAPI creates a new API instance.
 func NewAPI(fs *firestore.Client) *API {
-	return &API{fsClient: fs}
+	return &API{fsClient: fs, connManager: NewConnectionManager()}
 }
 
 // --- Helper Functions ---
+
+func (api *API) handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	// Get user email from query parameters
+	userEmail := r.URL.Query().Get("email")
+	if userEmail == "" {
+		http.Error(w, "User email is required", http.StatusBadRequest)
+		return
+	}
+
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("Failed to upgrade WebSocket connection for %s: %v", userEmail, err)
+		return
+	}
+
+	// Register the new connection
+	api.connManager.Add(userEmail, conn)
+
+	// Use defer to ensure the connection is cleaned up on exit
+	defer func() {
+		api.connManager.Remove(userEmail)
+		conn.Close()
+	}()
+
+	// Read loop to detect when the client closes the connection.
+	// We don't need to process incoming messages here for now.
+	for {
+		if _, _, err := conn.ReadMessage(); err != nil {
+			log.Printf("Client %s disconnected.", userEmail)
+			break // Exit the loop to trigger the defer
+		}
+	}
+}
 
 func (a *API) respondWithError(w http.ResponseWriter, code int, message string) {
 	a.respondWithJSON(w, code, map[string]string{"error": message})
@@ -167,7 +204,13 @@ func (a *API) InitiateDailyPlan(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	dateStr := time.Now().UTC().Format(defaultDateLayout)
-	docID, err := a.getDocID(r, dateStr)
+	userEmail, err := a.getEmailFromHeader(r)
+	if err != nil {
+		fmt.Printf("Error getting user email: %v\n", err)
+		a.respondWithError(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+	docID, err := a.getDocID(r, userEmail, dateStr)
 	if err != nil {
 		a.respondWithError(w, http.StatusUnauthorized, err.Error())
 		return
@@ -198,7 +241,14 @@ func (a *API) GetDailyPlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	docID, err := a.getDocID(r, dateStr)
+	userEmail, err := a.getEmailFromHeader(r)
+	if err != nil {
+		fmt.Printf("Error getting user email: %v\n", err)
+		a.respondWithError(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+
+	docID, err := a.getDocID(r, userEmail, dateStr)
 	if err != nil {
 		a.respondWithError(w, http.StatusUnauthorized, err.Error())
 		return
@@ -246,19 +296,13 @@ func (a *API) UpdateTodayDailyPlan(w http.ResponseWriter, r *http.Request) {
 	var updatedPlan DailyTrainingPlan
 
 	body, _ := io.ReadAll(r.Body)
-	fmt.Printf("body: %s\n", body)
+	fmt.Printf("body: %s\n", body) // Keep for debugging if needed
 
 	if err := json.Unmarshal(body, &updatedPlan); err != nil {
 		a.respondWithError(w, http.StatusBadRequest, "Invalid request payload")
 		return
 	}
-	fmt.Printf("Received updated plan: %+v\n", updatedPlan)
-
-	//if err := json.NewDecoder(r.Body).Decode(&updatedPlan); err != nil {
-	//	a.respondWithError(w, http.StatusBadRequest, "Invalid request payload")
-	//	return
-	//}
-	//fmt.Printf("Received updated plan: %+v\n", updatedPlan)
+	// fmt.Printf("Received updated plan: %+v\n", updatedPlan) // Keep for debugging if needed
 
 	// Ensure the update is for today and ID matches
 	if updatedPlan.Date != "" && updatedPlan.Date != todayStr {
@@ -288,7 +332,14 @@ func (a *API) UpdateTodayDailyPlan(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	docID, err := a.getDocID(r, todayStr)
+	userEmail, err := a.getEmailFromHeader(r)
+	if err != nil {
+		fmt.Printf("Error getting user email: %v\n", err)
+		a.respondWithError(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+
+	docID, err := a.getDocID(r, userEmail, todayStr)
 	if err != nil {
 		a.respondWithError(w, http.StatusUnauthorized, err.Error())
 		return
@@ -316,31 +367,31 @@ func (a *API) UpdateTodayDailyPlan(w http.ResponseWriter, r *http.Request) {
 		a.respondWithError(w, http.StatusInternalServerError, "Failed to parse updated plan data: "+err.Error())
 		return
 	}
+
+	if finalPlan.ID != "" { // Ensure the update succeeded
+		log.Printf("Sending WebSocket update to user: %s", userEmail)
+		message := WebSocketMessage{
+			Action: "PLAN_UPDATED",
+			// FIX: Send the full, final plan object, not the partial update from the request.
+			Data: finalPlan,
+		}
+		a.connManager.SendMessage(userEmail, message)
+	}
+
 	a.respondWithJSON(w, http.StatusOK, finalPlan)
 }
 
-func (a *API) getDocID(r *http.Request, dateStr string) (docID string, err error) {
+func (a *API) getDocID(r *http.Request, userEmail, dateStr string) (docID string, err error) {
+	return fmt.Sprintf("%s-%s", userEmail, dateStr), nil
+}
+
+// Get email from header
+func (a *API) getEmailFromHeader(r *http.Request) (string, error) {
 	// In a real application, this would involve authenticating the user,
 	// e.g., via a JWT token in the request headers.
 	// For this example, we'll return a placeholder user.
-	// Extract user info from request context if middleware set it, or from headers.
-	// Example: Assume user email is in a custom header for simplicity
-	//userEmail = r.Header.Get("X-User-Email")
-	//if userEmail == "" {
-	//	// Or retrieve from context if using an auth middleware
-	//	// userID, ok := r.Context().Value(authContextKey).(string)
-	//	// if !ok {
-	//	return "", errors.New("unauthenticated: user email header missing")
-	//	// }
-	//	// userEmail = fetchEmailFromUserID(userID) // Hypothetical function
-	//}
-	//// Basic validation
-	//if !isValidEmail(userEmail) {
-	//	return "", errors.New("invalid user email format")
-	//}
-	//return userEmail, nil
 	userEmail := "guillaume.blaquiere@gmail.com"
-	return fmt.Sprintf("%s-%s", userEmail, dateStr), nil
+	return userEmail, nil
 }
 
 func isValidEmail(email string) bool {

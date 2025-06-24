@@ -5,6 +5,7 @@ go 1.24
 require (
 	cloud.google.com/go/firestore v1.18.0
 	github.com/go-chi/chi/v5 v5.2.1
+	github.com/gorilla/websocket v1.5.3
 	github.com/rs/cors v1.11.1
 	google.golang.org/grpc v1.72.2
 )

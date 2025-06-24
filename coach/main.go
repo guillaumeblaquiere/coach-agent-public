@@ -2,16 +2,19 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
 	"cloud.google.com/go/firestore"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/gorilla/websocket"
 	"github.com/rs/cors"
 )
 
@@ -89,6 +92,9 @@ func main() {
 		r.Post("/daily-plans/initiate", api.InitiateDailyPlan) // Body: { "date": "YYYY-MM-DD" (opt), "templateId": "XYZ" (opt) }
 		r.Get("/daily-plans/{date}", api.GetDailyPlan)         // {date} can be "YYYY-MM-DD" or "today"
 		r.Put("/daily-plans/today", api.UpdateTodayDailyPlan)  // Body: Full DailyTrainingPlan object with updates
+
+		// WebSockets
+		r.Get("/ws", api.handleWebSocket)
 	})
 
 	// Health check endpoint
@@ -129,4 +135,77 @@ func main() {
 	}
 
 	log.Println("Server exiting")
+}
+
+// ConnectionManager gère les connexions WebSocket actives.
+type ConnectionManager struct {
+	connections map[string]*websocket.Conn
+	mu          sync.Mutex
+}
+
+// NewConnectionManager crée un nouveau gestionnaire de connexions.
+func NewConnectionManager() *ConnectionManager {
+	return &ConnectionManager{
+		connections: make(map[string]*websocket.Conn),
+	}
+}
+
+// Add enregistre une nouvelle connexion pour un utilisateur.
+func (cm *ConnectionManager) Add(userEmail string, conn *websocket.Conn) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	// Si une ancienne connexion existe, la fermer.
+	if oldConn, ok := cm.connections[userEmail]; ok {
+		oldConn.Close()
+	}
+	cm.connections[userEmail] = conn
+	log.Printf("WebSocket connection added for user: %s", userEmail)
+}
+
+// Remove supprime une connexion.
+func (cm *ConnectionManager) Remove(userEmail string) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	if _, ok := cm.connections[userEmail]; ok {
+		delete(cm.connections, userEmail)
+		log.Printf("WebSocket connection removed for user: %s", userEmail)
+	}
+}
+
+// WebSocketMessage est la structure pour nos messages.
+type WebSocketMessage struct {
+	Action string      `json:"action"`
+	Data   interface{} `json:"data"`
+}
+
+// SendMessage envoie un message à un utilisateur spécifique.
+func (cm *ConnectionManager) SendMessage(userEmail string, message WebSocketMessage) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	conn, ok := cm.connections[userEmail]
+	if !ok {
+		log.Printf("No active WebSocket connection for user: %s", userEmail)
+		return
+	}
+
+	jsonData, err := json.Marshal(message)
+	if err != nil {
+		log.Printf("Error marshalling WebSocket message for %s: %v", userEmail, err)
+		return
+	}
+
+	if err := conn.WriteMessage(websocket.TextMessage, jsonData); err != nil {
+		log.Printf("Error sending WebSocket message to %s: %v", userEmail, err)
+		// On pourrait vouloir supprimer la connexion si l'écriture échoue.
+		conn.Close()
+		delete(cm.connections, userEmail)
+	}
+}
+
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		// Mettez ici une logique plus stricte pour la production !
+		return true
+	},
 }
