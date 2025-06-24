@@ -188,7 +188,7 @@ def update_training(plan: dict) -> dict:
 
 root_agent = Agent(
     name="coach_agent",
-    model="gemini-2.0-flash",
+    model=os.getenv("GEMINI_MODEL_VERSION"),
     description=(
         """
         Tu es un agent qui coach l'utilisateur sur des seances de stretching. 

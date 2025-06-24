@@ -5,8 +5,8 @@ go 1.24.3
 require (
 	cloud.google.com/go/texttospeech v1.13.0
 	github.com/go-chi/chi/v5 v5.2.1
+	github.com/gorilla/websocket v1.5.3
 	github.com/rs/cors v1.11.1
-	google.golang.org/genproto v0.0.0-20250603155806-513f23925822
 )
 
 require (

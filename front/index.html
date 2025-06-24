@@ -88,7 +88,7 @@
             text-align: center;
         }
 
-        /* NOUVEAU STYLE POUR L'INPUT DE NOTE */
+        /* NEW STYLE FOR NOTE INPUT */
         .drill-note-input {
             flex-grow: 1;
             padding: 3px;
@@ -145,6 +145,13 @@
             border-bottom-right-radius: 4px;
         }
 
+        /* NEW: Style for agent messages */
+        .chat-message.agent {
+            background-color: #e6e6e6; /* Light grey for agent messages */
+            align-self: flex-start; /* Align to the left */
+            border-bottom-left-radius: 4px;
+        }
+
         .chat-message.audio {
             background-color: #e0e0e0; /* Different background for audio */
             align-self: flex-end; /* Assuming user recorded audio */
@@ -160,26 +167,17 @@
 
         #chat-input-area {
             display: flex;
+            flex-direction: column; /* Changed to stack elements vertically */
             padding: 10px;
             border-top: 1px solid #ccc;
             background-color: #fff;
-            align-items: center;
-        }
-
-        #chat-input-area {
-            display: flex;
-            flex-direction: column; /* Changé pour empiler les éléments verticalement */
-            padding: 10px;
-            border-top: 1px solid #ccc;
-            background-color: #fff;
-            /* align-items: center; */ /* Peut être ajusté ou supprimé selon le besoin */
         }
 
         .message-controls-row {
             display: flex;
             width: 100%;
             align-items: center;
-            margin-top: 5px; /* Ajoute un petit espace si vad-controls a une marge en bas */
+            margin-top: 5px; /* Adds a small space if vad-controls has a bottom margin */
         }
 
         #chat-message-input {
@@ -190,7 +188,7 @@
             margin-right: 5px;
         }
 
-        #chat-send-button, #chat-mic-button, #chat-delete-session-button { /* Ajout de #chat-delete-session-button */
+        #chat-send-button, #chat-mic-button, #chat-delete-session-button { /* Added #chat-delete-session-button */
             padding: 0;
             border: none;
             border-radius: 50%;
@@ -212,12 +210,52 @@
         }
 
         #chat-mic-button.recording {
-            background-color: #dc3545; /* Red when recording */
+            background-color: #dc3545; /* Red when streaming is active */
         }
 
+        #chat-delete-session-button { /* Specific style if needed, e.g., different color */
+            background-color: #dc3545; /* Red for a delete action */
+        }
 
-        #chat-delete-session-button { /* Style spécifique si besoin, par ex. couleur différente */
-            background-color: #dc3545; /* Rouge pour une action de suppression */
+        /* NEW: Style for mic gain slider */
+        .mic-gain-control {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            margin-bottom: 5px;
+            font-size: 0.8em;
+        }
+
+        .mic-gain-control input[type="range"] {
+            flex-grow: 1;
+            margin-left: 10px;
+            -webkit-appearance: none; /* Override default look */
+            appearance: none;
+            height: 4px;
+            background: #d3d3d3;
+            outline: none;
+            opacity: 0.7;
+            -webkit-transition: .2s;
+            transition: opacity .2s;
+            border-radius: 2px;
+        }
+
+        .mic-gain-control input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: #007bff;
+            cursor: pointer;
+        }
+
+        .mic-gain-control input[type="range"]::-moz-range-thumb {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: #007bff;
+            cursor: pointer;
         }
     </style>
 </head>
@@ -239,22 +277,23 @@
         <!-- Messages will be appended here -->
     </div>
     <div id="chat-input-area">
-        <div id="vad-controls" style="display: flex; flex-direction: column; margin-bottom: 5px; width: 100%;">
-            <label for="vad-threshold-slider" style="font-size: 0.8em; margin-bottom: 2px;">Seuil VAD:</label>
-            <!-- Label simplifié -->
-            <div style="display: flex; align-items: center;">
-                <input type="range" id="vad-threshold-slider" min="1" max="80" step="1" value="15"
-                       style="flex-grow: 1; margin-right: 5px;">
-                <span id="vad-threshold-value" style="font-size: 0.8em; min-width: 25px; text-align: right;">15</span>
+        <!-- NEW: VU Meter for mic activity -->
+        <div id="vad-controls" style="display: flex; align-items: center; width: 100%; margin-bottom: 5px;">
+            <span style="margin-right: 10px; font-size: 0.8em;">Mic Activity:</span>
+            <div id="vu-meter" style="flex-grow: 1; height: 10px; background-color: #e0e0e0; border: 1px solid #ccc; border-radius: 5px; overflow: hidden;">
+                <div id="vu-meter-level" style="width: 0%; height: 100%; background-color: #4caf50; transition: width 0.05s ease-out;"></div>
             </div>
-            <progress id="mic-gain-meter" value="0" max="255"
-                      style="width: 100%; height: 5px; margin-top: 2px;"></progress>
+        </div>
+        <!-- NEW: Mic Gain Control -->
+        <div class="mic-gain-control">
+            <span>Mic Gain:</span>
+            <input type="range" id="mic-gain-slider" min="0.5" max="3.0" value="1.0" step="0.1">
         </div>
         <div class="message-controls-row">
             <input type="text" id="chat-message-input" placeholder="Type a message...">
             <button id="chat-send-button" title="Send">➔</button>
             <button id="chat-mic-button" title="Toggle Microphone">🎤</button>
-            <button id="chat-delete-session-button" title="Delete Session">🗑️</button> <!-- NOUVEAU BOUTON -->
+            <button id="chat-delete-session-button" title="Delete Session">🗑️</button> <!-- NEW BUTTON -->
         </div>
     </div>
 </div>
@@ -448,15 +487,15 @@
                         repsDisplay.textContent = currentRepetition;
                         minRepsInCategory = Math.min(minRepsInCategory, currentRepetition);
 
-                        // CHAMP NOTE AJOUTÉ ICI
+                        // NOTE FIELD ADDED HERE
                         const noteInput = document.createElement('input');
                         noteInput.type = 'text';
                         noteInput.classList.add('drill-note-input');
                         noteInput.placeholder = 'Notes...';
                         noteInput.value = currentNote;
-                        // Fin ajout champ note
+                        // End of note field addition
 
-                        drillControls.append(decButton, repsDisplay, incButton, noteInput); // noteInput ajouté ici
+                        drillControls.append(decButton, repsDisplay, incButton, noteInput); // noteInput added here
                         drillElement.appendChild(drillControls);
                         content.appendChild(drillElement);
                     }
@@ -523,9 +562,9 @@
             let newReps = (achievement.repetition || 0) + adjustment;
             if (newReps < 0) newReps = 0;
 
-            // Récupérer la note actuelle depuis le champ input dans le DOM
+            // Get the current note from the input field in the DOM
             const drillElement = planContainer.querySelector(`.drill[data-category-id="${categoryId}"][data-drill-id="${drillId}"]`);
-            let noteFromInput = achievement.note; // Valeur par défaut
+            let noteFromInput = achievement.note; // Default value
             if (drillElement) {
                 const noteInputElement = drillElement.querySelector('.drill-note-input');
                 if (noteInputElement) {
@@ -534,11 +573,11 @@
             }
 
             achievement.repetition = newReps;
-            achievement.note = noteFromInput; // Mettre à jour la note dans les données locales
+            achievement.note = noteFromInput; // Update the note in local data
 
             displayPlan(currentPlanTemplate, currentDailyPlanData); // Optimistic UI update (re-renders with new note)
 
-            saveDrillUpdate(categoryId, drillId, newReps, achievement.note); // Envoyer la note mise à jour
+            saveDrillUpdate(categoryId, drillId, newReps, achievement.note); // Send the updated note
         }
 
         function adjustCategoryReps(categoryId, adjustment) {
@@ -554,12 +593,12 @@
             if (!ensureDailyPlanDataInitialized()) return;
 
             const categoryDrills = currentPlanTemplate.categories[categoryId].drills;
-            const drillsToUpdate = {}; // Changé de [] à {} pour correspondre au payload attendu
+            const drillsToUpdate = {}; // Changed from [] to {} to match the expected payload
 
             if (!currentDailyPlanData.repetitions[categoryId]) {
                 currentDailyPlanData.repetitions[categoryId] = {};
             }
-            // Initialiser drillsToUpdate[categoryId] si ce n'est pas déjà fait
+            // Initialize drillsToUpdate[categoryId] if not already done
             if (!drillsToUpdate[categoryId]) {
                 drillsToUpdate[categoryId] = {};
             }
@@ -572,9 +611,9 @@
                 let newReps = (achievement.repetition || 0) + adjustment;
                 if (newReps < 0) newReps = 0;
 
-                // Récupérer la note actuelle depuis le champ input dans le DOM pour ce drill
+                // Get the current note from the input field in the DOM for this drill
                 const drillElement = planContainer.querySelector(`.drill[data-category-id="${categoryId}"][data-drill-id="${drillId}"]`);
-                let noteFromInput = achievement.note; // Valeur par défaut
+                let noteFromInput = achievement.note; // Default value
                 if (drillElement) {
                     const noteInputElement = drillElement.querySelector('.drill-note-input');
                     if (noteInputElement) {
@@ -592,8 +631,8 @@
             displayPlan(currentPlanTemplate, currentDailyPlanData); // Optimistic UI update
 
             // Now, call a function to save all these updates to the backend
-            if (Object.keys(drillsToUpdate[categoryId]).length > 0) { // Vérifier s'il y a des drills à mettre à jour dans cette catégorie
-                // Le payload pour saveMultipleDrillUpdates attend un objet où les clés sont les categoryId
+            if (Object.keys(drillsToUpdate[categoryId]).length > 0) { // Check if there are drills to update in this category
+                // The payload for saveMultipleDrillUpdates expects an object where keys are categoryId
                 const payloadForBackend = {[categoryId]: drillsToUpdate[categoryId]};
                 saveMultipleDrillUpdates(payloadForBackend);
             }
@@ -659,7 +698,7 @@
                 const response = await fetch(coachBackendURL + '/api/v1/daily-plans/today', {
                     method: 'PUT',
                     headers: {'Content-Type': 'application/json',
-                    'X-User-Email': userEmail},
+                        'X-User-Email': userEmail},
                     body: JSON.stringify(payload)
                 });
                 if (!response.ok) {
@@ -717,30 +756,414 @@
         const chatSendButton = document.getElementById('chat-send-button');
         const chatMicButton = document.getElementById('chat-mic-button');
         const chatDeleteSessionButton = document.getElementById('chat-delete-session-button');
-        const vadThresholdSlider = document.getElementById('vad-threshold-slider');
-        const vadThresholdValueDisplay = document.getElementById('vad-threshold-value');
-        const micGainMeter = document.getElementById('mic-gain-meter');
+        const vuMeterLevel = document.getElementById('vu-meter-level'); // NEW: Get VU meter element
+        const micGainSlider = document.getElementById('mic-gain-slider'); // NEW: Get mic gain slider
 
-        let mediaRecorder;
-        let audioChunks = [];
-        let isMicMuted = true; // Start muted
         let audioContext;
-        let analyser;
         let microphoneStream;
-        let vadInterval;
-        const MIN_RECORDING_DURATION_MS = 300;
-        const VAD_CHECK_INTERVAL = 100;
-        let VAD_THRESHOLD = parseFloat(vadThresholdSlider.value);
-        const SILENCE_DURATION_THRESHOLD = 500;
-        let silenceStartTime = 0;
-        let hasDetectedSpeechInSegment = false;
+        let micGainNode; // NEW: GainNode for microphone input
+        let workletNode;
+        let audioStreamSocket; // WebSocket for audio
+        let isStreaming = false;
 
-        vadThresholdSlider.addEventListener('input', () => {
-            VAD_THRESHOLD = parseFloat(vadThresholdSlider.value);
-            vadThresholdValueDisplay.textContent = VAD_THRESHOLD.toFixed(0);
+        // --- Audio Playback Queue ---
+        let audioQueue = [];
+        let isAudioPlaying = false;
+        let currentAudioSource = null; // NEW: To hold the currently playing source
+        const AGENT_AUDIO_SAMPLE_RATE = 24000; // For audio coming FROM the agent
+
+        // --- Audio Capture and Resampling ---
+        const TARGET_SAMPLE_RATE = 16000; // For audio going TO the agent
+
+        // The AudioWorklet is the modern way to process audio in a separate thread.
+        const audioWorkletProcessor = `
+            class AudioStreamerProcessor extends AudioWorkletProcessor {
+                process(inputs, outputs, parameters) {
+                    const inputData = inputs[0][0];
+                    if (inputData) {
+                        // Send the raw audio data (Float32Array) to the main thread.
+                        this.port.postMessage(inputData);
+                    }
+                    return true; // Keep the processor running
+                }
+            }
+            registerProcessor('audio-streamer-processor', AudioStreamerProcessor);
+        `;
+        const workletBlob = new Blob([audioWorkletProcessor], { type: 'application/javascript' });
+        const workletURL = URL.createObjectURL(workletBlob);
+
+        // --- Helper Functions ---
+
+        /**
+         * Updates the VU meter based on the audio data chunk.
+         * @param {Float32Array | null} data The float audio data.
+         */
+        function updateVuMeter(data) {
+            if (!data || data.length === 0) {
+                vuMeterLevel.style.width = '0%';
+                return;
+            }
+            let sumSquares = 0.0;
+            for (const sample of data) {
+                sumSquares += sample * sample;
+            }
+            const rms = Math.sqrt(sumSquares / data.length);
+            // rms is between 0 and 1. Scale it for better visibility.
+            const volume = Math.min(100, rms * 200); // Clamp at 100%
+            vuMeterLevel.style.width = `${volume}%`;
+        }
+
+
+        /**
+         * Converts a Float32Array of audio samples to a 16-bit PCM ArrayBuffer.
+         * @param {Float32Array} input The float audio data (samples between -1.0 and 1.0).
+         * @returns {ArrayBuffer} The 16-bit PCM audio data.
+         */
+        function floatTo16BitPCM(input) {
+            const output = new DataView(new ArrayBuffer(input.length * 2));
+            for (let i = 0; i < input.length; i++) {
+                const s = Math.max(-1, Math.min(1, input[i]));
+                // Convert to 16-bit integer
+                const pcmSample = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                output.setInt16(i * 2, pcmSample, true); // true for little-endian
+            }
+            return output.buffer;
+        }
+
+        /**
+         * Converts an ArrayBuffer to a base64 string.
+         * @param {ArrayBuffer} buffer The buffer to convert.
+         * @returns {string} The base64 encoded string.
+         */
+        function arrayBufferToBase64(buffer) {
+            let binary = '';
+            const bytes = new Uint8Array(buffer);
+            const len = bytes.byteLength;
+            for (let i = 0; i < len; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            return window.btoa(binary);
+        }
+
+        /**
+         * Converts a base64 string to an ArrayBuffer.
+         * @param {string} base64 The base64 string to convert.
+         * @returns {ArrayBuffer} The decoded ArrayBuffer.
+         */
+        function base64ToArrayBuffer(base64) {
+            const binary_string = window.atob(base64);
+            const len = binary_string.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binary_string.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        /**
+         * Converts a 16-bit PCM ArrayBuffer to a Float32Array.
+         * @param {ArrayBuffer} arrayBuffer The 16-bit PCM audio data.
+         * @returns {Float32Array} The float audio data for playback.
+         */
+        function pcm16ToFloat(arrayBuffer) {
+            const int16Array = new Int16Array(arrayBuffer);
+            const float32Array = new Float32Array(int16Array.length);
+            for (let i = 0; i < int16Array.length; i++) {
+                float32Array[i] = int16Array[i] / 32768.0;
+            }
+            return float32Array;
+        }
+
+        // --- Audio Playback Queue Logic ---
+
+        /**
+         * NEW: Stops the current audio playback and clears the queue.
+         */
+        function stopAndClearAudioQueue() {
+            console.log("Interrupting audio playback and clearing queue.");
+            audioQueue = []; // Purge the queue
+            if (currentAudioSource) {
+                currentAudioSource.stop(); // This will trigger the onended event
+            }
+        }
+
+        function playNextChunkInQueue() {
+            if (audioQueue.length === 0) {
+                isAudioPlaying = false;
+                currentAudioSource = null;
+                console.log("Audio queue finished or cleared.");
+                return;
+            }
+
+            isAudioPlaying = true;
+            const float32Audio = audioQueue.shift(); // Get the next chunk from the front of the queue
+
+            if (!audioContext || audioContext.state !== 'running') {
+                console.warn("AudioContext not running, cannot play audio. Re-queuing chunk.");
+                audioQueue.unshift(float32Audio); // Put the chunk back at the front
+                isAudioPlaying = false;
+                return;
+            }
+
+            const audioBuffer = audioContext.createBuffer(
+                1,
+                float32Audio.length,
+                AGENT_AUDIO_SAMPLE_RATE
+            );
+            audioBuffer.copyToChannel(float32Audio, 0);
+
+            const source = audioContext.createBufferSource();
+            currentAudioSource = source; // Store the new source
+            source.buffer = audioBuffer;
+            source.connect(audioContext.destination);
+            source.onended = playNextChunkInQueue; // The key to sequential playback
+            source.start();
+            console.log(`Playing audio chunk of ${float32Audio.length} samples. Queue size: ${audioQueue.length}`);
+        }
+
+
+        async function startStreaming() {
+            if (isStreaming) return;
+
+            audioQueue = [];
+            isAudioPlaying = false;
+            currentAudioSource = null;
+
+            // 1. Initialize AudioContext and load our Worklet
+            try {
+                if (!audioContext || audioContext.state === 'closed') {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    console.log(`AudioContext created. Initial state: ${audioContext.state}, Sample rate: ${audioContext.sampleRate} Hz`);
+                }
+
+                if (audioContext.state === 'suspended') {
+                    await audioContext.resume();
+                    console.log(`AudioContext resumed. New state: ${audioContext.state}`);
+                }
+
+                await audioContext.audioWorklet.addModule(workletURL);
+            } catch (e) {
+                console.error("AudioContext/Worklet error:", e);
+                addMessageToChat("The audio context could not be started.", "system-error");
+                return;
+            }
+
+            // 2. Establish the WebSocket connection
+            const wsURL = `${coachAgentURL.replace('http', 'ws')}/api/v1/chat/stream`;
+            audioStreamSocket = new WebSocket(wsURL);
+
+            audioStreamSocket.onopen = async () => {
+                addMessageToChat("Streaming connection established.", "system-info");
+
+                // 3. Once the WebSocket is open, request microphone access
+                try {
+                    microphoneStream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            // Capture at the native sample rate for best quality before resampling
+                            sampleRate: audioContext.sampleRate,
+                            channelCount: 1,
+                            echoCancellation: true,
+                            noiseSuppression: true,
+                        }
+                    });
+
+                    // NEW: Create GainNode and connect it
+                    micGainNode = audioContext.createGain();
+                    micGainNode.gain.value = parseFloat(micGainSlider.value); // Set initial gain from slider
+
+                    // 4. Connect the microphone stream to our Worklet (via GainNode)
+                    const source = audioContext.createMediaStreamSource(microphoneStream);
+                    source.connect(micGainNode); // Connect source to gain node
+
+                    workletNode = new AudioWorkletNode(audioContext, 'audio-streamer-processor');
+                    micGainNode.connect(workletNode); // Connect gain node to worklet node
+
+                    // --- CRITICAL CHANGE: Resample audio before sending ---
+                    workletNode.port.onmessage = async (event) => {
+                        if (audioStreamSocket && audioStreamSocket.readyState === WebSocket.OPEN) {
+                            const inputFloat32Array = event.data;
+
+                            // 1. Create a buffer with the original audio data
+                            const originalBuffer = audioContext.createBuffer(1, inputFloat32Array.length, audioContext.sampleRate);
+                            originalBuffer.copyToChannel(inputFloat32Array, 0);
+
+                            // 2. Resample the audio to the target rate using OfflineAudioContext
+                            const duration = originalBuffer.duration;
+                            const offlineContext = new OfflineAudioContext(1, duration * TARGET_SAMPLE_RATE, TARGET_SAMPLE_RATE);
+                            const bufferSource = offlineContext.createBufferSource();
+                            bufferSource.buffer = originalBuffer;
+                            bufferSource.connect(offlineContext.destination);
+                            bufferSource.start();
+
+                            const resampledBuffer = await offlineContext.startRendering();
+                            const resampledData = resampledBuffer.getChannelData(0);
+
+                            // 3. Convert the resampled audio to 16-bit PCM and send
+                            const pcm16Buffer = floatTo16BitPCM(resampledData);
+                            const base64Data = arrayBufferToBase64(pcm16Buffer);
+
+                            const message = {
+                                mime_type: "audio/pcm",
+                                data: base64Data
+                            };
+
+                            updateVuMeter(inputFloat32Array); // Keep VU meter responsive with original data
+                            audioStreamSocket.send(JSON.stringify(message));
+                        }
+                    };
+
+                    isStreaming = true;
+                    chatMicButton.classList.add('recording');
+                    chatMicButton.title = "Stop streaming";
+
+                } catch (err) {
+                    addMessageToChat(`Microphone error: ${err.message}`, "system-error");
+                    stopStreaming();
+                }
+            };
+
+            // --- MODIFIED: Handle incoming messages, including interruption ---
+            audioStreamSocket.onmessage = (event) => {
+                if (typeof event.data === 'string') {
+                    try {
+                        const message = JSON.parse(event.data);
+
+                        // Handle control messages first
+                        if (message.interrupted) {
+                            addMessageToChat("Agent interrupted.", "system-info");
+                            stopAndClearAudioQueue(); // Stop audio and clear queue
+                            return; // Stop processing this message further
+                        }
+                        if (message.turn_complete) {
+                            addMessageToChat("Agent turn complete.", "system-info");
+                            return;
+                        }
+
+                        // Handle data messages
+                        if (message.mime_type === 'audio/pcm' && message.data) {
+                            const pcm16Buffer = base64ToArrayBuffer(message.data);
+                            const float32Audio = pcm16ToFloat(pcm16Buffer);
+
+                            if (float32Audio.length > 0 && !float32Audio.every(s => s === 0)) {
+                                audioQueue.push(float32Audio);
+                                if (!isAudioPlaying) {
+                                    playNextChunkInQueue();
+                                }
+                            }
+                        } else if (message.mime_type === 'text/plain' && message.data) {
+                            addMessageToChat(message.data, 'agent');
+                        } else {
+                            console.log("Unknown message format received:", message);
+                        }
+                    } catch (e) {
+                        console.error("Error processing received message:", e, "Data:", event.data);
+                    }
+                }
+            };
+
+            audioStreamSocket.onclose = (event) => {
+                let reason = event.reason || "Connection terminated.";
+                addMessageToChat(`Streaming stopped: ${reason}`, "system-info");
+                stopStreaming();
+            };
+
+            audioStreamSocket.onerror = (error) => {
+                addMessageToChat("Streaming connection error.", "system-error");
+                console.error("WebSocket error:", error);
+                stopStreaming();
+            };
+        }
+
+        function stopStreaming() {
+            if (microphoneStream) {
+                microphoneStream.getTracks().forEach(track => track.stop());
+                microphoneStream = null;
+            }
+            if (workletNode) {
+                workletNode.port.close();
+                workletNode.disconnect();
+                workletNode = null;
+            }
+            // NEW: Disconnect and nullify micGainNode
+            if (micGainNode) {
+                micGainNode.disconnect();
+                micGainNode = null;
+            }
+            if (audioContext && audioContext.state !== 'closed') {
+                audioContext.close();
+                audioContext = null;
+            }
+            if (audioStreamSocket) {
+                audioStreamSocket.close();
+                audioStreamSocket = null;
+            }
+
+            stopAndClearAudioQueue(); // Ensure audio is stopped and queue is cleared
+
+            isStreaming = false;
+            chatMicButton.classList.remove('recording');
+            chatMicButton.title = "Start streaming";
+            chatMessageInput.disabled = false;
+            chatSendButton.disabled = false;
+            updateVuMeter(null);
+        }
+
+        // Event listener for the microphone button
+        chatMicButton.addEventListener('click', () => {
+            if (isStreaming) {
+                stopStreaming();
+            } else {
+                startStreaming();
+            }
         });
 
-        function addMessageToChat(text, type = 'user', isAudio = false, audioBlobUrl = null) {
+        // NEW: Event listener for mic gain slider
+        micGainSlider.addEventListener('input', () => {
+            if (micGainNode) {
+                micGainNode.gain.value = parseFloat(micGainSlider.value);
+                console.log(`Microphone gain set to: ${micGainNode.gain.value}`);
+            }
+        });
+
+        // Function to send text messages
+        function sendMessage() {
+            const messageText = chatMessageInput.value.trim();
+            if (messageText === '') {
+                return;
+            }
+
+            if (!audioStreamSocket || audioStreamSocket.readyState !== WebSocket.OPEN) {
+                addMessageToChat("WebSocket connection not established. Please start streaming (click mic button) first.", "system-error");
+                console.error("WebSocket not open. Cannot send text message.");
+                return;
+            }
+
+            const message = {
+                mime_type: "text/plain",
+                data: messageText
+            };
+
+            try {
+                audioStreamSocket.send(JSON.stringify(message));
+                addMessageToChat(messageText, 'user');
+                chatMessageInput.value = '';
+            } catch (e) {
+                console.error("Error sending text message:", e);
+                addMessageToChat("Error sending message. Please try again.", "system-error");
+            }
+        }
+
+        // Event listeners for text input and send button
+        chatSendButton.addEventListener('click', sendMessage);
+        chatMessageInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+
+        // Simplified function to add messages to the chat history
+        function addMessageToChat(text, type = 'user') {
             const messageElement = document.createElement('div');
             messageElement.classList.add('chat-message', type);
 
@@ -748,300 +1171,10 @@
             if (type === 'system-success') messageElement.style.color = 'green';
             if (type === 'system-info') messageElement.style.color = 'blue';
 
-
-            if (isAudio && audioBlobUrl) {
-                messageElement.classList.add('audio');
-                const audioElement = document.createElement('audio');
-                audioElement.controls = true;
-                audioElement.src = audioBlobUrl;
-                messageElement.appendChild(audioElement);
-            } else {
-                messageElement.textContent = text;
-            }
-
+            messageElement.textContent = text;
             chatHistory.appendChild(messageElement);
             chatHistory.scrollTop = chatHistory.scrollHeight;
-
-            if (type !== 'user' && type !== 'received') {
-                const audioElement = messageElement.querySelector('audio');
-                if (audioElement) {
-                    // Autoplay for system responses with audio might be desired or not.
-                }
-            } else if (type === 'received') { // Agent's response
-                const audioElement = messageElement.querySelector('audio');
-                if (audioElement) {
-                    audioElement.play().catch(e => console.warn("Audio playback failed for received message:", e));
-                }
-            }
         }
-
-        chatSendButton.addEventListener('click', () => {
-            const messageText = chatMessageInput.value.trim();
-            if (messageText) {
-                addMessageToChat(messageText, 'user');
-                chatMessageInput.value = '';
-                sendChatMessage({text: messageText});
-            }
-        });
-
-        chatMessageInput.addEventListener('keypress', (event) => {
-            if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault();
-                chatSendButton.click();
-            }
-        });
-
-        async function setupMicrophone() {
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                addMessageToChat("getUserMedia not supported on your browser!", "system-error");
-                return;
-            }
-            try {
-                microphoneStream = await navigator.mediaDevices.getUserMedia({audio: true});
-                isMicMuted = false;
-                chatMicButton.classList.remove('muted');
-                chatMicButton.title = "Mute Microphone (Currently Unmuted)";
-
-                hasDetectedSpeechInSegment = false;
-                audioChunks = [];
-
-                mediaRecorder = new MediaRecorder(microphoneStream);
-                mediaRecorder.ondataavailable = event => {
-                    if (event.data.size > 0) {
-                        audioChunks.push(event.data);
-                    }
-                };
-
-                mediaRecorder.onstop = async () => {
-                    chatMicButton.classList.remove('recording');
-                    chatMicButton.title = isMicMuted ? "Toggle Microphone (Currently Muted)" : "Mute Microphone (Currently Unmuted)";
-
-                    if (hasDetectedSpeechInSegment && audioChunks.length > 0) {
-                        const audioBlob = new Blob(audioChunks, {type: 'audio/webm;codecs=opus'});
-                        audioChunks = [];
-                        hasDetectedSpeechInSegment = false;
-
-                        try {
-                            const tempAudio = document.createElement('audio');
-                            const tempUrl = URL.createObjectURL(audioBlob);
-                            tempAudio.src = tempUrl;
-                            tempAudio.onloadedmetadata = () => {
-                                URL.revokeObjectURL(tempUrl);
-                                if (tempAudio.duration * 1000 >= MIN_RECORDING_DURATION_MS) {
-                                    const audioUrlForDisplay = URL.createObjectURL(audioBlob);
-                                    addMessageToChat(null, 'user', true, audioUrlForDisplay);
-                                    sendChatMessage({audioBlob: audioBlob});
-                                    console.log(`Audio sent, duration: ${(tempAudio.duration * 1000).toFixed(0)}ms`);
-                                } else {
-                                    console.log(`Audio discarded, duration too short: ${(tempAudio.duration * 1000).toFixed(0)}ms`);
-                                    addMessageToChat("Recording too short, discarded.", "system-info");
-                                }
-                            };
-                            tempAudio.onerror = () => {
-                                URL.revokeObjectURL(tempUrl);
-                                console.warn("Could not determine audio duration, sending anyway.");
-                                const audioUrlForDisplay = URL.createObjectURL(audioBlob);
-                                addMessageToChat(null, 'user', true, audioUrlForDisplay);
-                                sendChatMessage({audioBlob: audioBlob});
-                            };
-                        } catch (e) {
-                            console.error("Error in audio duration check or sending:", e);
-                            const audioUrlForDisplay = URL.createObjectURL(audioBlob);
-                            addMessageToChat(null, 'user', true, audioUrlForDisplay);
-                            sendChatMessage({audioBlob: audioBlob});
-                        }
-                    } else {
-                        console.log("No speech detected or audio chunks empty, not sending.");
-                        if (audioChunks.length > 0) audioChunks = [];
-                        hasDetectedSpeechInSegment = false;
-                    }
-
-                    if (isMicMuted && vadInterval) {
-                        clearInterval(vadInterval);
-                        vadInterval = null;
-                        if (audioContext && audioContext.state !== 'closed') audioContext.close();
-                    }
-                };
-
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                analyser = audioContext.createAnalyser();
-                const source = audioContext.createMediaStreamSource(microphoneStream);
-                source.connect(analyser);
-                analyser.fftSize = 512;
-                const dataArray = new Uint8Array(analyser.frequencyBinCount);
-
-                if (vadInterval) clearInterval(vadInterval);
-
-                vadInterval = setInterval(() => {
-                    if (isMicMuted || !mediaRecorder || !analyser) {
-                        micGainMeter.value = 0;
-                        if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop();
-                        if (vadInterval) clearInterval(vadInterval);
-                        vadInterval = null;
-                        if (audioContext && audioContext.state !== 'closed') audioContext.close();
-                        return;
-                    }
-
-                    analyser.getByteFrequencyData(dataArray);
-                    let sum = 0;
-                    for (let i = 0; i < dataArray.length; i++) {
-                        sum += dataArray[i];
-                    }
-                    const averageVolume = sum / dataArray.length;
-                    micGainMeter.value = averageVolume;
-
-                    if (averageVolume > VAD_THRESHOLD) {
-                        if (mediaRecorder.state === "inactive") {
-                            audioChunks = [];
-                            mediaRecorder.start(VAD_CHECK_INTERVAL);
-                            chatMicButton.classList.add('recording');
-                            chatMicButton.title = "Recording... (Click to Mute)";
-                            hasDetectedSpeechInSegment = true;
-                        }
-                        silenceStartTime = 0;
-                    } else {
-                        if (mediaRecorder.state === "recording") {
-                            if (silenceStartTime === 0) {
-                                silenceStartTime = Date.now();
-                            } else if (Date.now() - silenceStartTime > SILENCE_DURATION_THRESHOLD) {
-                                mediaRecorder.stop();
-                                silenceStartTime = 0;
-                            }
-                        }
-                    }
-                }, VAD_CHECK_INTERVAL);
-
-            } catch (err) {
-                console.error("Error accessing microphone:", err);
-                addMessageToChat(`Microphone access error: ${err.message}`, "system-error");
-                stopMicrophone(true);
-            }
-        }
-
-        function stopMicrophone(isError = false) {
-            isMicMuted = true;
-
-            if (mediaRecorder && mediaRecorder.state === "recording") {
-                mediaRecorder.stop();
-            }
-            mediaRecorder = null;
-
-
-            if (microphoneStream) {
-                microphoneStream.getTracks().forEach(track => track.stop());
-                microphoneStream = null;
-            }
-
-            if (vadInterval) {
-                clearInterval(vadInterval);
-                vadInterval = null;
-            }
-            if (audioContext && audioContext.state !== 'closed') {
-                audioContext.close().catch(e => console.warn("Error closing audio context:", e));
-                audioContext = null;
-            }
-
-            analyser = null;
-            audioChunks = [];
-            hasDetectedSpeechInSegment = false;
-            silenceStartTime = 0;
-            micGainMeter.value = 0;
-
-            chatMicButton.classList.add('muted');
-            chatMicButton.classList.remove('recording');
-            chatMicButton.title = "Toggle Microphone (Currently Muted)";
-        }
-
-        chatMicButton.addEventListener('click', () => {
-            if (isMicMuted) {
-                setupMicrophone();
-            } else {
-                stopMicrophone();
-            }
-        });
-
-        stopMicrophone();
-
-        async function sendChatMessage({text, audioBlob}) {
-            let payload = {};
-            let hasContent = false;
-
-            if (text) {
-                payload.text = text;
-                hasContent = true;
-            }
-
-            if (audioBlob) {
-                try {
-                    const base64Data = await blobToBase64(audioBlob);
-                    payload.inlineData = {
-                        mimeType: audioBlob.type || 'audio/webm',
-                        data: base64Data
-                    };
-                    hasContent = true;
-                } catch (error) {
-                    console.error('Error converting blob to base64:', error);
-                    addMessageToChat("Error processing audio for sending.", 'system-error');
-                    return;
-                }
-            }
-
-            if (!hasContent) {
-                console.log("No content to send in chat message.");
-                return;
-            }
-
-            try {
-                const response = await fetch(coachAgentURL + '/api/v1/chat', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(payload)
-                });
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`Server error: ${response.status} ${errorText}`);
-                }
-
-                const data = await response.json();
-
-                if (data.status === 'success' && data.part) {
-                    if (data.part.text) {
-                        addMessageToChat(data.part.text, 'received');
-                    }
-                    if (data.part.inlineData && data.part.inlineData.data) {
-                        const audioUrl = `data:${data.part.inlineData.mimeType};base64,${data.part.inlineData.data}`;
-                        addMessageToChat(null, 'received', true, audioUrl);
-                    }
-                    if (data.action === "REFRESH_DAILY_DATA") {
-                        addMessageToChat("Agent updated daily values. Refreshing...", "system-info");
-                        await loadDailyPlanData(formatDate(currentDate));
-                        displayPlan(currentPlanTemplate, currentDailyPlanData);
-                    }
-
-                } else if (data.error) {
-                    addMessageToChat(`Agent error: ${data.error}`, 'system-error');
-                } else {
-                    addMessageToChat("Received an unexpected response from the agent.", 'system-error');
-                }
-            } catch (error) {
-                console.error('Error sending/receiving chat message:', error);
-                addMessageToChat(`Network or server error: ${error.message}`, 'system-error');
-            }
-        }
-
-        function blobToBase64(blob) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                    const base64String = reader.result.split(',')[1];
-                    resolve(base64String);
-                };
-                reader.onerror = reject;
-                reader.readAsDataURL(blob);
-            });
-        }
-
 
         chatDeleteSessionButton.addEventListener('click', () => {
             if (!confirm("Are you sure you want to delete the session and clear chat history?")) {
@@ -1073,7 +1206,7 @@
         let ws;
 
         function connectWebSocket() {
-            // Construire l'URL du WebSocket
+            // Build the WebSocket URL
             const wsURL = `${coachBackendURL.replace('http', 'ws')}/api/v1/ws?email=${encodeURIComponent(userEmail)}`;
             console.log("Connecting to WebSocket:", wsURL);
 
@@ -1116,7 +1249,7 @@
         }
         connectWebSocket()
     })
-        // End of DOMContentLoaded
+    // End of DOMContentLoaded
 </script>
 </body>
 </html>

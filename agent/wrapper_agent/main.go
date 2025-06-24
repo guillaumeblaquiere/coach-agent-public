@@ -8,13 +8,16 @@ import (
 	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/gorilla/websocket"
 	"github.com/rs/cors"
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 	// ... other imports ...
@@ -23,25 +26,33 @@ import (
 )
 
 const (
-	CoachAgentLocalPortEnvVar = "COACH_AGENT_LOCAL_PORT"
-	CoachAgentNameEnvVar      = "COACH_AGENT_NAME"
+	CoachAgentPortEnvVar = "COACH_AGENT_PORT"
+	CoachAgentHostEnvVar = "COACH_AGENT_HOST"
+	CoachAgentNameEnvVar = "COACH_AGENT_NAME"
 
-	CoachAgentBaseURL    = "http://localhost:%s"
-	CoachAgentSessionUrl = "/apps/%s/users/%s/sessions/%s"
+	CoachAgentBaseURL       = "http://%s:%s"
+	CoachAgentSessionPath   = "/apps/%s/users/%s/sessions/%s"
+	CoachAgentStreamingPath = "/run_live"
 )
 
 var (
-	coachBaseUrl        string
-	coachAgentLocalPort string
-	coachAgentName      string
-	ttsClient           *texttospeech.Client
+	coachBaseUrl   string
+	coachAgentPort string
+	coachAgentHost string
+	coachAgentName string
+	ttsClient      *texttospeech.Client
 )
 
 func main() {
+	// Get environment variables
+	coachAgentHost = os.Getenv(CoachAgentHostEnvVar)
+	if coachAgentHost == "" {
+		panic("Coach agent host is not set (" + CoachAgentHostEnvVar + ")")
+	}
 
-	coachAgentLocalPort = os.Getenv(CoachAgentLocalPortEnvVar)
-	if coachAgentLocalPort == "" {
-		panic("Coach agent local port is not set (" + CoachAgentLocalPortEnvVar + ")")
+	coachAgentPort = os.Getenv(CoachAgentPortEnvVar)
+	if coachAgentPort == "" {
+		panic("Coach agent local port is not set (" + CoachAgentPortEnvVar + ")")
 	}
 
 	coachAgentName = os.Getenv(CoachAgentNameEnvVar)
@@ -49,7 +60,7 @@ func main() {
 		panic("Coach agent name is not set (" + CoachAgentNameEnvVar + ")")
 	}
 
-	coachBaseUrl = fmt.Sprintf(CoachAgentBaseURL, coachAgentLocalPort)
+	coachBaseUrl = fmt.Sprintf(CoachAgentBaseURL, coachAgentHost, coachAgentPort)
 
 	var err error
 	ttsClient, err = texttospeech.NewClient(context.Background())
@@ -77,6 +88,7 @@ func main() {
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Post("/chat", handlePrompt)
 		r.Delete("/chat", cleanSession)
+		r.Get("/chat/stream", handleChatStream) // NEW WEBSOCKET ROUTE
 	})
 
 	// Get the port from the env var
@@ -124,7 +136,7 @@ func cleanSession(w http.ResponseWriter, r *http.Request) {
 
 	sessionID := getSessionID() // Get the session ID for today
 
-	url := coachBaseUrl + fmt.Sprintf(CoachAgentSessionUrl, coachAgentName, user, sessionID)
+	url := coachBaseUrl + fmt.Sprintf(CoachAgentSessionPath, coachAgentName, user, sessionID)
 
 	req, err := http.NewRequest("DELETE", url, nil)
 	if err != nil {
@@ -292,7 +304,7 @@ func AskAgent(user string, sessionID string, req WrapperRequest) (wrapperRespons
 
 	//fmt.Printf("ADK request: %s\n", string(adkReqBody))
 
-	adkResponse, err := http.Post("http://localhost:"+coachAgentLocalPort+"/run", "application/json", bytes.NewBuffer(adkReqBody))
+	adkResponse, err := http.Post("http://localhost:"+coachAgentPort+"/run", "application/json", bytes.NewBuffer(adkReqBody))
 	if err != nil {
 		wrapperResponse = WrapperResponse{
 			Status: "error",
@@ -362,7 +374,7 @@ func AskAgent(user string, sessionID string, req WrapperRequest) (wrapperRespons
 }
 
 func initSession(user string, sessionID string) (status int, err error) {
-	url := coachBaseUrl + fmt.Sprintf(CoachAgentSessionUrl, coachAgentName, user, sessionID)
+	url := coachBaseUrl + fmt.Sprintf(CoachAgentSessionPath, coachAgentName, user, sessionID)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("failed to create session request: %w", err)
@@ -492,4 +504,138 @@ type NewMessage struct {
 type Part struct {
 	Text       string      `json:"text,omitempty"`
 	InlineData *InlineData `json:"inlineData,omitempty"`
+}
+
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		// For development, accept everything.
+		// In production, use strict origin validation.
+		return true
+	},
+}
+
+// handleChatStream manages the WebSocket connection and proxies it to the Python agent.
+func handleChatStream(w http.ResponseWriter, r *http.Request) {
+	clientConn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("Error upgrading client WebSocket: %v", err)
+		return
+	}
+	defer clientConn.Close()
+	log.Println("Client (browser) connected via WebSocket.")
+
+	user, _ := getUser(r) // Get the user (even if it's hardcoded for now)
+	sessionID := getSessionID()
+
+	// Create the session, to be sure it exists
+	_, err = initSession(user, sessionID)
+	if err != nil {
+		log.Printf("Error during session creation: %v", err)
+		return
+	}
+
+	// Build the URL for the Python agent
+	agentURL := url.URL{
+		Scheme: "ws",
+		Host:   fmt.Sprintf("%s:%s", coachAgentHost, coachAgentPort), // Your Python agent's port
+		Path:   CoachAgentStreamingPath,
+	}
+	q := agentURL.Query()
+	q.Set("app_name", coachAgentName)
+	q.Set("user_id", user)
+	q.Set("session_id", sessionID)
+	q.Set("modalities", "AUDIO")
+	agentURL.RawQuery = q.Encode()
+
+	log.Printf("Connecting to backend agent at: %s", agentURL.String())
+
+	// Connect to the Python agent
+	agentConn, _, err := websocket.DefaultDialer.Dial(agentURL.String(), nil)
+	if err != nil {
+		log.Printf("Error connecting to Python WebSocket agent: %v", err)
+		// Inform the client that a server-side error occurred
+		clientConn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseInternalServerErr, "Could not reach the agent service"))
+		return
+	}
+	defer agentConn.Close()
+	log.Println("Successfully connected to Python WebSocket agent.")
+
+	// Set up the bidirectional proxy
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	// Goroutine to forward messages from client to agent
+	go func() {
+		defer wg.Done()
+		for {
+			messageType, p, err := clientConn.ReadMessage()
+			if err != nil {
+				log.Printf("Read error (client->agent): %v", err)
+				agentConn.WriteMessage(websocket.CloseMessage, []byte{})
+				return
+			}
+
+			// --- NEW: Debugging log ---
+			if messageType == websocket.TextMessage {
+				var msg map[string]interface{}
+				if json.Unmarshal(p, &msg) == nil {
+					// It's a valid JSON
+					mimeType, _ := msg["mime_type"].(string)
+					data, _ := msg["data"].(string)
+					if mimeType != "audio/pcm" {
+						log.Printf("[PROXY: Client->Agent] Received JSON message. Mime-Type: %s, Data length: %d", mimeType, len(data))
+					}
+				} else {
+					// Not a JSON, or unexpected structure
+					log.Printf("[PROXY: Client->Agent] Received Text message, length: %d", len(p))
+				}
+			} else {
+				log.Printf("[PROXY: Client->Agent] Received Binary message, length: %d", len(p))
+			}
+			// --- END NEW ---
+
+			if err := agentConn.WriteMessage(messageType, p); err != nil {
+				log.Printf("Write error (client->agent): %v", err)
+				return
+			}
+		}
+	}()
+
+	// Goroutine to forward messages from agent to client
+	go func() {
+		defer wg.Done()
+		for {
+			messageType, p, err := agentConn.ReadMessage()
+			// --- NEW: Debugging log ---
+			if messageType == websocket.TextMessage {
+				var msg map[string]interface{}
+				if json.Unmarshal(p, &msg) == nil {
+					// It's a valid JSON
+					mimeType, _ := msg["mime_type"].(string)
+					data, _ := msg["data"].(string)
+					log.Printf("[PROXY: Agent->Client] Received JSON message. Mime-Type: %s, Data length: %d", mimeType, len(data))
+				} else {
+					// Not a JSON, or unexpected structure
+					log.Printf("[PROXY: Agent->Client] Received Text message, length: %d", len(p))
+				}
+			} else {
+				log.Printf("[PROXY: Agent->Client] Received Binary message, length: %d", len(p))
+			}
+			// --- END NEW ---
+
+			if err != nil {
+				log.Printf("Read error (agent->client): %v", err)
+				clientConn.WriteMessage(websocket.CloseMessage, []byte{})
+				return
+			}
+			// --- BUG FIX: Was writing to agentConn, now correctly writes to clientConn ---
+			if err := clientConn.WriteMessage(messageType, p); err != nil {
+				log.Printf("Write error (agent->client): %v", err)
+				return // No need to do anything else, the client connection is likely broken
+			}
+		}
+	}()
+
+	wg.Wait()
+	log.Println("WebSocket proxy finished.")
 }

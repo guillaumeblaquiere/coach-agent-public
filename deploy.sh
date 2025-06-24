@@ -59,7 +59,7 @@ gcloud beta run deploy coach-agent-wrapper \
   --cpu 1 \
   --image gcr.io/${projectId}/coach-agent-wrapper:latest \
   --port 8081 \
-  --set-env-vars=COACH_AGENT_LOCAL_PORT=8000,COACH_AGENT_NAME=coach_agent \
+  --set-env-vars=COACH_AGENT_HOST=localhost,COACH_AGENT_PORT=8000,COACH_AGENT_NAME=coach_agent \
   --depends-on=adk \
   --container adk \
   --memory 512Mi \
