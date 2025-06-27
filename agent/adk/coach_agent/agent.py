@@ -7,62 +7,7 @@ from urllib.parse import urljoin
 
 from .prompt import get_prompt
 
-
-def get_weather(city: str) -> dict:
-    """Retrieves the current weather report for a specified city.
-
-    Args:
-        city (str): The name of the city for which to retrieve the weather report.
-
-    Returns:
-        dict: status and result or error msg.
-    """
-    if city.lower() == "new york":
-        return {
-            "status": "success",
-            "report": (
-                "The weather in New York is sunny with a temperature of 25 degrees"
-                " Celsius (77 degrees Fahrenheit)."
-            ),
-        }
-    else:
-        return {
-            "status": "error",
-            "error_message": f"Weather information for '{city}' is not available.",
-        }
-
-
-def get_current_time(city: str) -> dict:
-    """Returns the current time in a specified city.
-
-    Args:
-        city (str): The name of the city for which to retrieve the current time.
-
-    Returns:
-        dict: status and result or error msg.
-    """
-
-    if city.lower() == "new york":
-        tz_identifier = "America/New_York"
-    else:
-        return {
-            "status": "error",
-            "error_message": (
-                f"Sorry, I don't have timezone information for {city}."
-            ),
-        }
-
-    tz = ZoneInfo(tz_identifier)
-    now = datetime.datetime.now(tz)
-    report = (
-        f'The current time in {city} is {now.strftime("%Y-%m-%d %H:%M:%S %Z%z")}'
-    )
-    return {"status": "success", "report": report}
-
-
-def cheer_up():
-    """Provides a cheering message."""
-    return {"status": "success", "report": "You're doing great! Keep up the good work!"}
+sourceRequest = "agent"
 
 def get_date_today() -> str:
     """Returns today's date in YYYY-MM-DD format."""
@@ -153,7 +98,7 @@ def update_training(plan: dict) -> dict:
     if not coach_backend_url:
         return {"status": "error", "error_message": "COACH_BACKEND_URL environment variable is not set."}
 
-    current_url = f"{coach_backend_url}/api/v1/daily-plans/today"
+    current_url = f"{coach_backend_url}/api/v1/daily-plans/today?source={sourceRequest}"
     max_redirects = 5  # Limite pour éviter les boucles infinies
 
     try:

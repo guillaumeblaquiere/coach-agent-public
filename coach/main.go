@@ -139,14 +139,14 @@ func main() {
 
 // ConnectionManager gère les connexions WebSocket actives.
 type ConnectionManager struct {
-	connections map[string]*websocket.Conn
+	connections map[string][]*websocket.Conn
 	mu          sync.Mutex
 }
 
 // NewConnectionManager crée un nouveau gestionnaire de connexions.
 func NewConnectionManager() *ConnectionManager {
 	return &ConnectionManager{
-		connections: make(map[string]*websocket.Conn),
+		connections: make(map[string][]*websocket.Conn),
 	}
 }
 
@@ -154,20 +154,24 @@ func NewConnectionManager() *ConnectionManager {
 func (cm *ConnectionManager) Add(userEmail string, conn *websocket.Conn) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
-	// Si une ancienne connexion existe, la fermer.
-	if oldConn, ok := cm.connections[userEmail]; ok {
-		oldConn.Close()
+	if _, ok := cm.connections[userEmail]; !ok {
+		cm.connections[userEmail] = make([]*websocket.Conn, 0)
 	}
-	cm.connections[userEmail] = conn
-	log.Printf("WebSocket connection added for user: %s", userEmail)
+	cm.connections[userEmail] = append(cm.connections[userEmail], conn)
+	log.Printf("WebSocket connection added for user: %s. Conn length is now %d \n", userEmail, len(cm.connections[userEmail]))
 }
 
 // Remove supprime une connexion.
-func (cm *ConnectionManager) Remove(userEmail string) {
+func (cm *ConnectionManager) Remove(userEmail string, conn *websocket.Conn) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 	if _, ok := cm.connections[userEmail]; ok {
-		delete(cm.connections, userEmail)
+		for i, c := range cm.connections[userEmail] {
+			if c == conn {
+				cm.connections[userEmail] = append(cm.connections[userEmail][:i], cm.connections[userEmail][i+1:]...)
+				break
+			}
+		}
 		log.Printf("WebSocket connection removed for user: %s", userEmail)
 	}
 }
@@ -176,6 +180,7 @@ func (cm *ConnectionManager) Remove(userEmail string) {
 type WebSocketMessage struct {
 	Action string      `json:"action"`
 	Data   interface{} `json:"data"`
+	Source string      `json:"source"`
 }
 
 // SendMessage envoie un message à un utilisateur spécifique.
@@ -183,7 +188,7 @@ func (cm *ConnectionManager) SendMessage(userEmail string, message WebSocketMess
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
-	conn, ok := cm.connections[userEmail]
+	connections, ok := cm.connections[userEmail]
 	if !ok {
 		log.Printf("No active WebSocket connection for user: %s", userEmail)
 		return
@@ -195,11 +200,21 @@ func (cm *ConnectionManager) SendMessage(userEmail string, message WebSocketMess
 		return
 	}
 
-	if err := conn.WriteMessage(websocket.TextMessage, jsonData); err != nil {
-		log.Printf("Error sending WebSocket message to %s: %v", userEmail, err)
-		// On pourrait vouloir supprimer la connexion si l'écriture échoue.
-		conn.Close()
-		delete(cm.connections, userEmail)
+	// Send the message to all the connections for this user
+	for _, conn := range connections {
+		if err := conn.WriteMessage(websocket.TextMessage, jsonData); err != nil {
+			log.Printf("Error sending WebSocket message to %s: %v", userEmail, err)
+			// On pourrait vouloir supprimer la connexion si l'écriture échoue.
+			conn.Close()
+			// Remove the connection from the list
+			for i, c := range cm.connections[userEmail] {
+				if c == conn {
+					cm.connections[userEmail] = append(cm.connections[userEmail][:i], cm.connections[userEmail][i+1:]...)
+					break
+				}
+			}
+
+		}
 	}
 }
 

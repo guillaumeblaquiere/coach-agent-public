@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -26,21 +25,22 @@ import (
 )
 
 const (
-	CoachAgentPortEnvVar = "COACH_AGENT_PORT"
-	CoachAgentHostEnvVar = "COACH_AGENT_HOST"
-	CoachAgentNameEnvVar = "COACH_AGENT_NAME"
-
+	CoachAgentPortEnvVar    = "COACH_AGENT_PORT"
+	CoachAgentHostEnvVar    = "COACH_AGENT_HOST"
+	CoachAgentNameEnvVar    = "COACH_AGENT_NAME"
+	CoachBackendURLEnvVar   = "COACH_BACKEND_URL"
 	CoachAgentBaseURL       = "http://%s:%s"
 	CoachAgentSessionPath   = "/apps/%s/users/%s/sessions/%s"
 	CoachAgentStreamingPath = "/run_live"
 )
 
 var (
-	coachBaseUrl   string
-	coachAgentPort string
-	coachAgentHost string
-	coachAgentName string
-	ttsClient      *texttospeech.Client
+	coachBaseUrl    string
+	coachAgentPort  string
+	coachAgentHost  string
+	coachAgentName  string
+	coachBackendUrl string
+	ttsClient       *texttospeech.Client
 )
 
 func main() {
@@ -61,6 +61,11 @@ func main() {
 	}
 
 	coachBaseUrl = fmt.Sprintf(CoachAgentBaseURL, coachAgentHost, coachAgentPort)
+
+	coachBackendUrl = os.Getenv(CoachBackendURLEnvVar)
+	if coachBackendUrl == "" {
+		panic("Coach backend URL is not set (" + CoachBackendURLEnvVar + ")")
+	}
 
 	var err error
 	ttsClient, err = texttospeech.NewClient(context.Background())
@@ -86,7 +91,7 @@ func main() {
 	r.Use(corsMiddleware.Handler)
 
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Post("/chat", handlePrompt)
+		//r.Post("/chat", handlePrompt)
 		r.Delete("/chat", cleanSession)
 		r.Get("/chat/stream", handleChatStream) // NEW WEBSOCKET ROUTE
 	})
@@ -171,63 +176,63 @@ func getSessionID() (sessionID string) {
 	return time.Now().UTC().Format("2006-01-02")
 }
 
-func handlePrompt(w http.ResponseWriter, r *http.Request) {
-	// Get the user
-	user, err := getUser(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
-
-	// Get the prompt mime type
-	mimeType := r.Header.Get("Content-Type")
-	if mimeType != "application/json" {
-		http.Error(w, "Invalid mime type", http.StatusBadRequest)
-		return
-	}
-
-	// Parse the request
-	var req WrapperRequest
-	err = json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		http.Error(w, "Invalid request payload", http.StatusBadRequest)
-		return
-	}
-
-	//fmt.Printf("req is: %+v\n", req)
-	//TODO check supported mime type of the REQ inline data
-
-	wrapperResponse, err := AskAgent(user, getSessionID(), req)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	//Add audio version of the agent text response with Text to speech API
-	if wrapperResponse.Part.Text != "" {
-		audioContent, err := textToSpeech(wrapperResponse.Part.Text)
-		if err != nil {
-			log.Printf("Error converting text to speech: %v", err)
-			// It's up to you how to handle this. You might still send the text response,
-			// or return an error to the client. Here, we'll just log and continue with only the text:
-		} else {
-			wrapperResponse.Part.InlineData = &InlineData{
-				MimeType: "audio/mp3", // or "audio/wav" depending on your settings
-				Data:     audioContent,
-			}
-		}
-	}
-
-	// Send the response back to the client
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	err = json.NewEncoder(w).Encode(wrapperResponse)
-	if err != nil {
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		return
-	}
-
-}
+//func handlePrompt(w http.ResponseWriter, r *http.Request) {
+//	// Get the user
+//	user, err := getUser(r)
+//	if err != nil {
+//		http.Error(w, err.Error(), http.StatusUnauthorized)
+//		return
+//	}
+//
+//	// Get the prompt mime type
+//	mimeType := r.Header.Get("Content-Type")
+//	if mimeType != "application/json" {
+//		http.Error(w, "Invalid mime type", http.StatusBadRequest)
+//		return
+//	}
+//
+//	// Parse the request
+//	var req WrapperRequest
+//	err = json.NewDecoder(r.Body).Decode(&req)
+//	if err != nil {
+//		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+//		return
+//	}
+//
+//	//fmt.Printf("req is: %+v\n", req)
+//	//TODO check supported mime type of the REQ inline data
+//
+//	wrapperResponse, err := AskAgent(user, getSessionID(), req)
+//	if err != nil {
+//		http.Error(w, err.Error(), http.StatusInternalServerError)
+//		return
+//	}
+//
+//	//Add audio version of the agent text response with Text to speech API
+//	if wrapperResponse.Part.Text != "" {
+//		audioContent, err := textToSpeech(wrapperResponse.Part.Text)
+//		if err != nil {
+//			log.Printf("Error converting text to speech: %v", err)
+//			// It's up to you how to handle this. You might still send the text response,
+//			// or return an error to the client. Here, we'll just log and continue with only the text:
+//		} else {
+//			wrapperResponse.Part.InlineData = &InlineData{
+//				MimeType: "audio/mp3", // or "audio/wav" depending on your settings
+//				Data:     audioContent,
+//			}
+//		}
+//	}
+//
+//	// Send the response back to the client
+//	w.Header().Set("Content-Type", "application/json")
+//	w.WriteHeader(http.StatusOK)
+//	err = json.NewEncoder(w).Encode(wrapperResponse)
+//	if err != nil {
+//		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+//		return
+//	}
+//
+//}
 
 func textToSpeech(text string) (string, error) {
 	// Remove special character from text
@@ -260,118 +265,118 @@ func textToSpeech(text string) (string, error) {
 	return base64.StdEncoding.EncodeToString(resp.AudioContent), nil
 }
 
-func AskAgent(user string, sessionID string, req WrapperRequest) (wrapperResponse WrapperResponse, err error) {
-
-	status, err := initSession(user, sessionID)
-	if err != nil {
-		wrapperResponse = WrapperResponse{
-			Status: "error",
-			Error:  fmt.Sprintf("failed to initialize session: %v", err),
-		}
-		return wrapperResponse, fmt.Errorf("failed to initialize session: %w", err)
-	}
-
-	parts := []Part{Part(req)}
-	if status == http.StatusCreated {
-		parts = []Part{
-			{
-				Text: " ",
-			},
-			Part(req),
-		}
-	}
-
-	// Create the ADK request
-	adkReq := AdkRequest{
-		AppName:   coachAgentName,
-		UserId:    user,
-		SessionId: sessionID,
-		NewMessage: NewMessage{
-			Role:  "user",
-			Parts: parts,
-		},
-	}
-
-	// Send the request to the ADK agent
-	adkReqBody, err := json.Marshal(adkReq)
-	if err != nil {
-		wrapperResponse = WrapperResponse{
-			Status: "error",
-			Error:  fmt.Sprintf("failed to marshal ADK request: %v", err),
-		}
-		return wrapperResponse, fmt.Errorf("failed to marshal ADK request: %w", err)
-	}
-
-	//fmt.Printf("ADK request: %s\n", string(adkReqBody))
-
-	adkResponse, err := http.Post("http://localhost:"+coachAgentPort+"/run", "application/json", bytes.NewBuffer(adkReqBody))
-	if err != nil {
-		wrapperResponse = WrapperResponse{
-			Status: "error",
-			Error:  fmt.Sprintf("failed to send request to ADK agent: %v", err),
-		}
-		return wrapperResponse, fmt.Errorf("failed to send request to ADK agent: %w", err)
-
-	}
-	defer adkResponse.Body.Close()
-
-	// Check the return code
-	if adkResponse.StatusCode != http.StatusOK {
-		adkResponseBody, _ := io.ReadAll(adkResponse.Body)
-		wrapperResponse = WrapperResponse{
-			Status: "error",
-			Error:  fmt.Sprintf("ADK agent returned status code %d: %s", adkResponse.StatusCode, string(adkResponseBody)),
-		}
-		return wrapperResponse, fmt.Errorf("ADK agent returned status code %d: %s", adkResponse.StatusCode, string(adkResponseBody))
-	}
-
-	// Read the ADK response
-	adkResponseBody, err := io.ReadAll(adkResponse.Body)
-	if err != nil {
-		wrapperResponse = WrapperResponse{
-			Status: "error",
-			Error:  fmt.Sprintf("failed to read ADK response body: %v", err),
-		}
-		return wrapperResponse, fmt.Errorf("failed to read ADK response body: %w", err)
-	}
-
-	//fmt.Printf("ADK response: %s\n", string(adkResponseBody))
-
-	// Parse the ADK response
-	var adkResp []AdkResponse
-	err = json.Unmarshal(adkResponseBody, &adkResp)
-	if err != nil {
-		wrapperResponse = WrapperResponse{
-			Status: "error",
-			Error:  fmt.Sprintf("failed to unmarshal ADK response: %v", err),
-		}
-		return wrapperResponse, fmt.Errorf("failed to unmarshal ADK response: %w", err)
-	}
-
-	// Extract the text from the ADK response
-	var responseJson strings.Builder
-	if adkResp != nil && len(adkResp) > 0 {
-		for _, respPart := range adkResp {
-			if respPart.Content.Parts != nil && len(respPart.Content.Parts) > 0 {
-				if respPart.Content.Parts[0].Text != "" {
-					responseJson.WriteString(respPart.Content.Parts[0].Text)
-				}
-			}
-		}
-	}
-
-	// Create the wrapper response
-	wrapperResponse = WrapperResponse{
-		Status: "success",
-		Part: Part{
-			Text: responseJson.String(),
-		},
-	}
-
-	//fmt.Printf("wrapperResponse is: %+v\n", wrapperResponse.Part.Text)
-
-	return
-}
+//func AskAgent(user string, sessionID string, req WrapperRequest) (wrapperResponse WrapperResponse, err error) {
+//
+//	status, err := initSession(user, sessionID)
+//	if err != nil {
+//		wrapperResponse = WrapperResponse{
+//			Status: "error",
+//			Error:  fmt.Sprintf("failed to initialize session: %v", err),
+//		}
+//		return wrapperResponse, fmt.Errorf("failed to initialize session: %w", err)
+//	}
+//
+//	parts := []Part{Part(req)}
+//	if status == http.StatusCreated {
+//		parts = []Part{
+//			{
+//				Text: " ",
+//			},
+//			Part(req),
+//		}
+//	}
+//
+//	// Create the ADK request
+//	adkReq := AdkRequest{
+//		AppName:   coachAgentName,
+//		UserId:    user,
+//		SessionId: sessionID,
+//		NewMessage: NewMessage{
+//			Role:  "user",
+//			Parts: parts,
+//		},
+//	}
+//
+//	// Send the request to the ADK agent
+//	adkReqBody, err := json.Marshal(adkReq)
+//	if err != nil {
+//		wrapperResponse = WrapperResponse{
+//			Status: "error",
+//			Error:  fmt.Sprintf("failed to marshal ADK request: %v", err),
+//		}
+//		return wrapperResponse, fmt.Errorf("failed to marshal ADK request: %w", err)
+//	}
+//
+//	//fmt.Printf("ADK request: %s\n", string(adkReqBody))
+//
+//	adkResponse, err := http.Post("http://localhost:"+coachAgentPort+"/run", "application/json", bytes.NewBuffer(adkReqBody))
+//	if err != nil {
+//		wrapperResponse = WrapperResponse{
+//			Status: "error",
+//			Error:  fmt.Sprintf("failed to send request to ADK agent: %v", err),
+//		}
+//		return wrapperResponse, fmt.Errorf("failed to send request to ADK agent: %w", err)
+//
+//	}
+//	defer adkResponse.Body.Close()
+//
+//	// Check the return code
+//	if adkResponse.StatusCode != http.StatusOK {
+//		adkResponseBody, _ := io.ReadAll(adkResponse.Body)
+//		wrapperResponse = WrapperResponse{
+//			Status: "error",
+//			Error:  fmt.Sprintf("ADK agent returned status code %d: %s", adkResponse.StatusCode, string(adkResponseBody)),
+//		}
+//		return wrapperResponse, fmt.Errorf("ADK agent returned status code %d: %s", adkResponse.StatusCode, string(adkResponseBody))
+//	}
+//
+//	// Read the ADK response
+//	adkResponseBody, err := io.ReadAll(adkResponse.Body)
+//	if err != nil {
+//		wrapperResponse = WrapperResponse{
+//			Status: "error",
+//			Error:  fmt.Sprintf("failed to read ADK response body: %v", err),
+//		}
+//		return wrapperResponse, fmt.Errorf("failed to read ADK response body: %w", err)
+//	}
+//
+//	//fmt.Printf("ADK response: %s\n", string(adkResponseBody))
+//
+//	// Parse the ADK response
+//	var adkResp []AdkResponse
+//	err = json.Unmarshal(adkResponseBody, &adkResp)
+//	if err != nil {
+//		wrapperResponse = WrapperResponse{
+//			Status: "error",
+//			Error:  fmt.Sprintf("failed to unmarshal ADK response: %v", err),
+//		}
+//		return wrapperResponse, fmt.Errorf("failed to unmarshal ADK response: %w", err)
+//	}
+//
+//	// Extract the text from the ADK response
+//	var responseJson strings.Builder
+//	if adkResp != nil && len(adkResp) > 0 {
+//		for _, respPart := range adkResp {
+//			if respPart.Content.Parts != nil && len(respPart.Content.Parts) > 0 {
+//				if respPart.Content.Parts[0].Text != "" {
+//					responseJson.WriteString(respPart.Content.Parts[0].Text)
+//				}
+//			}
+//		}
+//	}
+//
+//	// Create the wrapper response
+//	wrapperResponse = WrapperResponse{
+//		Status: "success",
+//		Part: Part{
+//			Text: responseJson.String(),
+//		},
+//	}
+//
+//	//fmt.Printf("wrapperResponse is: %+v\n", wrapperResponse.Part.Text)
+//
+//	return
+//}
 
 func initSession(user string, sessionID string) (status int, err error) {
 	url := coachBaseUrl + fmt.Sprintf(CoachAgentSessionPath, coachAgentName, user, sessionID)
@@ -516,12 +521,12 @@ var upgrader = websocket.Upgrader{
 
 // handleChatStream manages the WebSocket connection and proxies it to the Python agent.
 func handleChatStream(w http.ResponseWriter, r *http.Request) {
-	clientConn, err := upgrader.Upgrade(w, r, nil)
+	browserConn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("Error upgrading client WebSocket: %v", err)
 		return
 	}
-	defer clientConn.Close()
+	defer browserConn.Close()
 	log.Println("Client (browser) connected via WebSocket.")
 
 	user, _ := getUser(r) // Get the user (even if it's hardcoded for now)
@@ -554,11 +559,35 @@ func handleChatStream(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("Error connecting to Python WebSocket agent: %v", err)
 		// Inform the client that a server-side error occurred
-		clientConn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseInternalServerErr, "Could not reach the agent service"))
+		browserConn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseInternalServerErr, "Could not reach the agent service"))
 		return
 	}
 	defer agentConn.Close()
 	log.Println("Successfully connected to Python WebSocket agent.")
+
+	backendWsURL, err := url.Parse(coachBackendUrl)
+	if err != nil {
+		log.Printf("Error parsing backend URL: %v", err)
+		return
+	} else {
+		fmt.Printf("backendWsURL is: %+v\n", backendWsURL)
+		backendWsURL.Scheme = "ws"
+		backendWsURL.Path = "/api/v1/ws"
+		backendWsQuery := backendWsURL.Query()
+		backendWsQuery.Set("email", user)
+		backendWsURL.RawQuery = backendWsQuery.Encode()
+
+		log.Printf("Connecting to backend event stream at: %s", backendWsURL.String())
+		backendConn, _, err := websocket.DefaultDialer.Dial(backendWsURL.String(), nil)
+		if err != nil {
+			log.Printf("Error connecting to backend event stream: %v", err)
+		} else {
+			defer backendConn.Close()
+			log.Println("Successfully connected to backend event stream.")
+			// Start the backend->agent forwarder only if connection succeeded
+			go forwardBackendToAgent(backendConn, agentConn)
+		}
+	}
 
 	// Set up the bidirectional proxy
 	var wg sync.WaitGroup
@@ -568,10 +597,11 @@ func handleChatStream(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		defer wg.Done()
 		for {
-			messageType, p, err := clientConn.ReadMessage()
+			messageType, p, err := browserConn.ReadMessage()
 			if err != nil {
 				log.Printf("Read error (client->agent): %v", err)
 				agentConn.WriteMessage(websocket.CloseMessage, []byte{})
+				browserConn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseInternalServerErr, "Could not reach the agent service"))
 				return
 			}
 
@@ -606,36 +636,91 @@ func handleChatStream(w http.ResponseWriter, r *http.Request) {
 		defer wg.Done()
 		for {
 			messageType, p, err := agentConn.ReadMessage()
-			/*			// --- NEW: Debugging log ---
-						if messageType == websocket.TextMessage {
-							var msg map[string]interface{}
-							if json.Unmarshal(p, &msg) == nil {
-								// It's a valid JSON
-								mimeType, _ := msg["mime_type"].(string)
-								data, _ := msg["data"].(string)
-								log.Printf("[PROXY: Agent->Client] Received JSON message. Mime-Type: %s, Data length: %d", mimeType, len(data))
-							} else {
-								// Not a JSON, or unexpected structure
-								log.Printf("[PROXY: Agent->Client] Received Text message, length: %d", len(p))
-							}
-						} else {
-							log.Printf("[PROXY: Agent->Client] Received Binary message, length: %d", len(p))
-						}
-						// --- END NEW ---*/
-
 			if err != nil {
 				log.Printf("Read error (agent->client): %v", err)
-				clientConn.WriteMessage(websocket.CloseMessage, []byte{})
+				browserConn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
-			// --- BUG FIX: Was writing to agentConn, now correctly writes to clientConn ---
-			if err := clientConn.WriteMessage(messageType, p); err != nil {
-				log.Printf("Write error (agent->client): %v", err)
-				return // No need to do anything else, the client connection is likely broken
+
+			// --- NEW LOGIC ---
+			// 1. Forward the original message immediately (for text display).
+			if err := browserConn.WriteMessage(messageType, p); err != nil {
+				log.Printf("Write error (agent->client, original): %v", err)
+				return
 			}
+
+			// 2. If it's a text message, also generate and send speech.
+			if messageType == websocket.TextMessage {
+				var msg Part
+				if err := json.Unmarshal(p, &msg); err == nil {
+					// Check if it's a text part and not empty.
+					if msg.Text != "" {
+						// Run TTS in a separate goroutine to avoid blocking the proxy loop.
+						go func(textToSpeak string) {
+							log.Printf("Generating speech for: \"%s\"", textToSpeak)
+							audioContent, err := textToSpeech(textToSpeak)
+							if err != nil {
+								log.Printf("Error generating speech: %v", err)
+								return
+							}
+
+							// Create the audio message for the browser.
+							audioMessage := Part{
+								InlineData: &InlineData{
+									MimeType: "audio/pcm",
+									Data:     audioContent,
+								},
+							}
+							audioBytes, _ := json.Marshal(audioMessage)
+
+							// Send the audio message.
+							if err := browserConn.WriteMessage(websocket.TextMessage, audioBytes); err != nil {
+								log.Printf("Write error (agent->client, audio): %v", err)
+							}
+						}(msg.Text)
+					}
+				}
+			}
+			// --- END NEW LOGIC ---
 		}
 	}()
 
 	wg.Wait()
 	log.Println("WebSocket proxy finished.")
+}
+
+func forwardBackendToAgent(backendConn, agentConn *websocket.Conn) {
+	for {
+		_, p, err := backendConn.ReadMessage()
+		if err != nil {
+			log.Printf("Read error (backend->agent): %v", err)
+			return
+		}
+
+		var backendMsg struct {
+			Action string      `json:"action"`
+			Data   interface{} `json:"data"`
+			Source string      `json:"source"`
+		}
+		if err := json.Unmarshal(p, &backendMsg); err != nil {
+			log.Printf("Error unmarshalling backend event: %v", err)
+			continue
+		}
+
+		if backendMsg.Action == "PLAN_UPDATED" {
+			log.Println("Forwarding PLAN_UPDATED event to agent.")
+			agentEvent := map[string]interface{}{
+				"mime_type":    "application/json",
+				"event_source": backendMsg.Source,
+				"event_type":   "plan_updated",
+				"data":         backendMsg.Data,
+			}
+			agentEventBytes, _ := json.Marshal(agentEvent)
+
+			if err := agentConn.WriteMessage(websocket.TextMessage, agentEventBytes); err != nil {
+				log.Printf("Write error (backend->agent): %v", err)
+				return
+			}
+		}
+	}
 }

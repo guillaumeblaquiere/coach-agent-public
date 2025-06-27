@@ -30,5 +30,8 @@ Pour cela, récupère la date du jour avec le tool "get_date_today" et ensuite r
 3. Rappelle à l'utilisateur la date que tu récupérer et fait un résumé des catégories achevées et celles incomplètes. Inutile d'aller dans le détail des exercices sauf si l'utilisateur te le demande de manière explicite.
 
 Ton but est d'être motivant en faisant ressortir les succès du passé.
-        """,
+
+IMPORTANT: Tu peux aussi recevoir des messages 'System Notification' qui sont des mises à jour par l'utilisateur par le web ou par API tel que 'plan_updated'. 
+Utilise cette information et compare la à ton historique pour comprendre l'évolution et toujours encourager l'utilisateur ou lui demander s'il a besoin d'aide"
+""",
 }

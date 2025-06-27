@@ -1,5 +1,6 @@
 COACH_AGENT_PORT=8000 \
 COACH_AGENT_HOST=localhost \
+COACH_BACKEND_URL=http://localhost:8080 \
 COACH_AGENT_NAME="coach_agent" \
 go run .
 

@@ -19,12 +19,12 @@ from google.adk.sessions import Session
 from google.genai.types import (
     Part,
     Content,
-    Blob,
+    Blob, AudioTranscriptionConfig,
 )
 
 from google.adk.runners import Runner, InMemoryRunner
 from google.adk.agents import LiveRequestQueue
-from google.adk.agents.run_config import RunConfig
+from google.adk.agents.run_config import RunConfig, StreamingMode
 from google.adk.sessions.in_memory_session_service import InMemorySessionService
 
 from fastapi import FastAPI, WebSocket, Query, HTTPException
@@ -35,6 +35,7 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.types import Lifespan
 from starlette.websockets import WebSocketDisconnect
 
+from coach_agent.agent import sourceRequest
 from coach_agent.agent import root_agent
 
 logging.basicConfig(level=logging.INFO)
@@ -59,8 +60,10 @@ def get_my_app(
 
     @asynccontextmanager
     async def internal_lifespan(app: FastAPI):
-        # Initialize app state for runners to cache them
+        # Initialize app state for runners and active websockets
         app.state.runners = {}
+        # --- NEW: State to track active connections per session ---
+        app.state.active_websockets = {}  # Maps session_id -> (websocket, [tasks])
         try:
             if lifespan:
                 async with lifespan(app) as lifespan_context:
@@ -88,7 +91,7 @@ def get_my_app(
     # session_service is created once per app instance, which is correct for a shared service
     session_service = InMemorySessionService()
 
-    #### Session management
+    #### Session management (No changes here)
     @app.get(
         "/apps/{app_name}/users/{user_id}/sessions/{session_id}",
         response_model_exclude_none=True,
@@ -161,13 +164,38 @@ def get_my_app(
                 default=["TEXT", "AUDIO"]
             ),
     ) -> None:
+        # --- NEW: Handle reconnection by closing the previous connection ---
+        if session_id in app.state.active_websockets:
+            logger.warning(
+                f"Session {session_id} already has an active connection. "
+                f"Closing the old one to establish a new one."
+            )
+            old_websocket, old_tasks = app.state.active_websockets[session_id]
+            try:
+                # Closing the websocket will trigger WebSocketDisconnect in the old handler,
+                # which will then execute its `finally` block for cleanup.
+                await old_websocket.close(code=1001, reason="New connection established")
+            except Exception as e:
+                # The old socket might already be dead, which is fine.
+                logger.info(f"Could not close old websocket for session {session_id} (may already be closed): {e}")
+
+            # Proactively cancel the old tasks as a safeguard.
+            for task in old_tasks:
+                task.cancel()
+            await asyncio.gather(*old_tasks, return_exceptions=True)
+            logger.info(f"Old connection tasks for session {session_id} cancelled.")
+        # --- END NEW ---
+
         await websocket.accept()
         logger.info(f"User {user_id} connected to agent {app_name} with session {session_id} and modalities {modalities}")
 
         modality = "AUDIO" if "AUDIO" in modalities else "TEXT"
-        run_config = RunConfig(response_modalities=[modality])
+        run_config = RunConfig(
+            # streaming_mode=StreamingMode.BIDI,
+            response_modalities=[modality],
+            output_audio_transcription=AudioTranscriptionConfig()
+        )
 
-        # Retrieve or create the Runner instance from app.state.runners cache
         if app_name not in app.state.runners:
             logger.info(f"Creating new Runner for app_name: {app_name} and caching it.")
             app.state.runners[app_name] = Runner(
@@ -177,25 +205,13 @@ def get_my_app(
             )
         runner = app.state.runners[app_name]
 
-        session = await runner.session_service.get_session(
-            app_name=app_name, user_id=user_id, session_id=session_id
-        )
-        if not session:
-            await websocket.close(code=1002, reason="Session not found")
-            return
-
         live_request_queue = LiveRequestQueue()
-        # The `live_event_generator` is an async generator.
-        # It needs to be explicitly closed if the loop exits prematurely.
         live_event_generator = runner.run_live(
-            session=session, live_request_queue=live_request_queue, run_config=run_config
+            session_id=session_id, user_id=user_id, live_request_queue=live_request_queue, run_config=run_config
         )
 
         async def send_response():
             try:
-                # The `async for` loop is the only loop needed.
-                # The `live_event_generator` is long-lived and will yield events
-                # for multiple turns as new user inputs are processed.
                 async for event in live_event_generator:
                     if event.turn_complete or event.interrupted:
                         message = {
@@ -209,44 +225,32 @@ def get_my_app(
                         # for the next user input to produce more events.
                         continue
 
-                    part: Part = (
-                            event.content and event.content.parts and event.content.parts[0]
-                    )
+                    part: Part = event.content and event.content.parts and event.content.parts[0]
                     if not part:
                         continue
-
 
                     is_audio = part.inline_data and part.inline_data.mime_type.startswith("audio/pcm")
                     if is_audio:
                         audio_data = part.inline_data and part.inline_data.data
                         if audio_data:
-                            message = {
-                                "mime_type": "audio/pcm",
-                                "data": base64.b64encode(audio_data).decode("ascii")
-                            }
-                            # logger.info(f"[AGENT TO CLIENT]: audio/pcm: {len(audio_data)} bytes.")
+                            message = {"mime_type": "audio/pcm", "data": base64.b64encode(audio_data).decode("ascii")}
                             await websocket.send_text(json.dumps(message))
+                            # logger.info(f"[AGENT TO CLIENT]: audio/pcm: {len(audio_data)} bytes.")
                             continue
-                    elif part.text and event.partial:
-                        message = {
-                            "mime_type": "text/plain",
-                            "data": part.text
-                        }
+                    if part.text and event.partial:
+                        message = {"mime_type": "text/plain", "data": part.text}
                         await websocket.send_text(json.dumps(message))
-                        logger.info(f"[AGENT TO CLIENT]: text/plain: {message}")
+                        # logger.info(f"[AGENT TO CLIENT] ({session_id}): text/plain: {message}")
                     else:
-                        print(f"Received event: {event}")
+                        print(f"Received unhandled event: {event}")
             except asyncio.CancelledError:
-                logger.info("send_response task cancelled.")
+                logger.info(f"send_response task for session {session_id} cancelled.")
             except Exception as e:
-                logger.exception("Error in send_response task: %s", e)
+                logger.exception(f"Error in send_response task for session {session_id}: %s", e)
             finally:
-                # Ensure the async generator is closed if it's still active
-                # This is important for releasing resources held by the generator.
                 if hasattr(live_event_generator, 'aclose'):
                     await live_event_generator.aclose()
-                logger.info("Live event generator closed.")
-
+                logger.info(f"Live event generator for session {session_id} closed.")
 
         async def received_message():
             try:
@@ -261,46 +265,59 @@ def get_my_app(
                     mime_type = message["mime_type"]
                     data = message["data"]
 
-
                     if mime_type == "text/plain":
                         content = Content(role="user", parts=[Part.from_text(text=data)])
                         live_request_queue.send_content(content=content)
-                        logger.info(f"[CLIENT TO AGENT]: Text message: {data}")
+                        logger.info(f"[CLIENT TO AGENT] ({session_id}): Text message: {data}")
                     elif mime_type == "audio/pcm":
                         decoded_data = base64.b64decode(data)
                         live_request_queue.send_realtime(Blob(data=decoded_data, mime_type=mime_type))
                         # logger.info(f"[CLIENT TO AGENT]: audio/pcm chunk processed, size: {len(decoded_data)} bytes")
+                    elif mime_type == "application/json":
+                        event_source = message.get("event_source")
+                        if event_source != sourceRequest:
+                            event_type = message.get("event_type")
+                            event_data = message.get("data")
+                            logger.info(f"Received UI event '{event_type}' from wrapper.")
+                            system_notification = (
+                                f"System Notification: The user has just performed the action '{event_type}'.\n"
+                                f"Here is the new state of their plan:\n"
+                                f"{json.dumps(event_data, indent=2)}"
+                            )
+                            content = Content(role="user", parts=[Part.from_text(text=system_notification)])
+                            live_request_queue.send_content(content=content)
                     else:
                         logger.warning("Mime type not supported: %s", mime_type)
             except WebSocketDisconnect:
-                logger.info("Client disconnected during received_message.")
+                logger.info(f"Client for session {session_id} disconnected during received_message.")
             except asyncio.CancelledError:
-                logger.info("received_message task cancelled.")
+                logger.info(f"received_message task for session {session_id} cancelled.")
             except json.JSONDecodeError as je:
                 logger.error("Failed to decode JSON from client: %s", je)
             except Exception as e:
-                logger.exception("Error in received_message task: %s", e)
-            finally:
-                # No specific cleanup needed here beyond task cancellation.
-                pass
-
+                logger.exception(f"Error in received_message task for session {session_id}: %s", e)
 
         tasks = [
             asyncio.create_task(send_response()),
             asyncio.create_task(received_message()),
         ]
 
+        # --- NEW: Register the current connection and its tasks ---
+        app.state.active_websockets[session_id] = (websocket, tasks)
+
         try:
+            # --- MODIFIED: Use FIRST_COMPLETED for more robust exit handling ---
             done, pending = await asyncio.wait(
-                tasks, return_when=asyncio.FIRST_EXCEPTION
+                tasks, return_when=asyncio.FIRST_COMPLETED
             )
-            # Re-raise any exception from the completed tasks.
             for task in done:
-                task.result()
+                # Re-raise any exception to be caught by the outer try-except blocks
+                if task.exception():
+                    raise task.exception()
         except WebSocketDisconnect:
-            logger.info("Client disconnected during live websocket communication.")
+            logger.info(f"Client for session {session_id} disconnected gracefully.")
         except Exception as e:
-            logger.exception("Error during live websocket communication: %s", e)
+            logger.exception("Error during live websocket communication for session %s: %s", session_id, e)
             WEBSOCKET_INTERNAL_ERROR_CODE = 1011
             WEBSOCKET_MAX_BYTES_FOR_REASON = 123
             await websocket.close(
@@ -308,25 +325,31 @@ def get_my_app(
                 reason=str(e)[:WEBSOCKET_MAX_BYTES_FOR_REASON],
             )
         finally:
-            # Crucial: Cancel any remaining pending tasks
-            for task in pending:
-                if not task.done(): # Check if it's still running
-                    task.cancel()
-            # Wait for tasks to actually finish after cancellation
-            # `return_exceptions=True` prevents `CancelledError` from propagating here.
-            await asyncio.gather(*pending, return_exceptions=True)
+            # --- MODIFIED: More robust cleanup logic ---
+            logger.info(f"Cleaning up resources for session {session_id}.")
 
-            # Ensure live_request_queue is closed
+            # Remove the session from the active list, but only if it's this specific instance.
+            # This prevents a race condition where a new connection might have already been registered.
+            if session_id in app.state.active_websockets and app.state.active_websockets[session_id][0] is websocket:
+                del app.state.active_websockets[session_id]
+                logger.info(f"Session {session_id} removed from active connections.")
+
+            # Cancel all tasks associated with this connection.
+            for task in tasks:
+                task.cancel()
+
+            # Wait for tasks to finish their cancellation sequence.
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+            # The generator is closed by send_response's `finally` block.
+            # The queue must be closed here.
             live_request_queue.close()
-            logger.info("Live request queue closed.")
+            logger.info(f"Live request queue for session {session_id} closed.")
 
     return app
 
 # Instantiate the FastAPI application
-# The `agents_dir` parameter is required by get_fast_api_app,
-# but for this specific setup, it might not be directly used by InMemoryRunner.
-# Provide a dummy path if it's not relevant for your current agent setup.
 app = get_my_app(
-    agents_dir=".", # Or the actual path to your agents directory if needed
+    agents_dir=".",
     allow_origins=allowed_origins
 )

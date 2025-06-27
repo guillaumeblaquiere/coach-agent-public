@@ -20,6 +20,7 @@ import (
 const (
 	dailyPlansCollection = "dailyTrainingPlans"
 	defaultDateLayout    = "2006-01-02"
+	defaultRequestSource = "API"
 )
 
 var (
@@ -64,7 +65,7 @@ func (api *API) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	// Use defer to ensure the connection is cleaned up on exit
 	defer func() {
-		api.connManager.Remove(userEmail)
+		api.connManager.Remove(userEmail, conn)
 		conn.Close()
 	}()
 
@@ -292,6 +293,9 @@ func (a *API) UpdateTodayDailyPlan(w http.ResponseWriter, r *http.Request) {
 	now := time.Now().UTC()
 	todayStr := now.Format(defaultDateLayout)
 
+	source := a.getRequestSource(r)
+	fmt.Printf("Received request from source: %s\n", source)
+
 	// Body contain only the updated drills
 	var updatedPlan DailyTrainingPlan
 
@@ -373,7 +377,8 @@ func (a *API) UpdateTodayDailyPlan(w http.ResponseWriter, r *http.Request) {
 		message := WebSocketMessage{
 			Action: "PLAN_UPDATED",
 			// FIX: Send the full, final plan object, not the partial update from the request.
-			Data: finalPlan,
+			Data:   finalPlan,
+			Source: source,
 		}
 		a.connManager.SendMessage(userEmail, message)
 	}
@@ -392,6 +397,15 @@ func (a *API) getEmailFromHeader(r *http.Request) (string, error) {
 	// For this example, we'll return a placeholder user.
 	userEmail := "guillaume.blaquiere@gmail.com"
 	return userEmail, nil
+}
+
+func (a *API) getRequestSource(r *http.Request) (source string) {
+	// Get the source query parameter or set API as default one
+	source = r.URL.Query().Get("source")
+	if source == "" {
+		source = defaultRequestSource
+	}
+	return strings.ToLower(strings.TrimSpace(source))
 }
 
 func isValidEmail(email string) bool {
