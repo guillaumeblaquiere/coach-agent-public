@@ -25,15 +25,7 @@
         <!-- Messages will be appended here -->
     </div>
     <div id="chat-input-area">
-        <!-- NEW: Stream Connection Toggle Switch -->
-        <div class="stream-control">
-            <span>Coach Connection:</span>
-            <label class="switch">
-                <input type="checkbox" id="stream-toggle-switch">
-                <span class="slider round"></span>
-            </label>
-        </div>
-
+        <!-- MODIFIED: Added new control toggles -->
         <div id="vad-controls" style="display: flex; align-items: center; width: 100%; margin-bottom: 5px;">
             <span style="margin-right: 10px; font-size: 0.8em;">Mic Activity:</span>
             <div id="vu-meter" style="flex-grow: 1; height: 10px; background-color: #e0e0e0; border: 1px solid #ccc; border-radius: 5px; overflow: hidden;">
@@ -44,10 +36,51 @@
             <span>Mic Gain:</span>
             <input type="range" id="mic-gain-slider" min="0.5" max="3.0" value="1.0" step="0.1">
         </div>
+        <div class="stream-controls-grid">
+            <div class="stream-control">
+                <span>Coach Streaming:</span>
+                <label class="switch">
+                    <input type="checkbox" id="stream-toggle-switch">
+                    <span class="slider round"></span>
+                </label>
+            </div>
+            <div class="stream-control mic-toggle">
+                <span>Mic:</span>
+                <label class="switch">
+                    <input type="checkbox" id="mic-mute-toggle-switch">
+                    <span class="slider round"></span>
+                </label>
+            </div>
+
+            <div class="stream-control">
+                <span>Show Agent Text:</span>
+                <label class="switch">
+                    <input type="checkbox" id="show-text-toggle-switch" checked>
+                    <span class="slider round"></span>
+                </label>
+            </div>
+            <div class="stream-control">
+                <span>Play Agent Audio:</span>
+                <label class="switch">
+                    <input type="checkbox" id="play-audio-toggle-switch" checked>
+                    <span class="slider round"></span>
+                </label>
+            </div>
+        </div>
+        <div class="stream-controls-grid">
+            <div class="stream-control">
+                <span>Debug Mode:</span>
+                <label class="switch">
+                    <input type="checkbox" id="debug-mode-toggle-switch" checked>
+                    <span class="slider round"></span>
+                </label>
+            </div>
+        </div>
+
         <div class="message-controls-row">
             <input type="text" id="chat-message-input" placeholder="Type a message...">
             <button id="chat-send-button" title="Send">➔</button>
-            <button id="chat-mic-button" title="Toggle Microphone">🎤</button>
+            <!-- MODIFIED: Replaced mic button with a toggle switch -->
             <button id="chat-delete-session-button" title="Delete Session">🗑️</button>
         </div>
     </div>

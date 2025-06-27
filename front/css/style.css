@@ -1,9 +1,11 @@
-/* C:/Users/Guillou/IdeaProjects/coach/front/css/style.css */
+/* General Body and Page Layout */
 body {
     font-family: sans-serif;
     margin-right: 350px; /* Space for the chat pane */
-    position: relative; /* For chat pane positioning context if needed */
+    position: relative;
 }
+
+/* --- Training Plan Styles --- */
 
 .date-controls {
     text-align: center;
@@ -37,6 +39,11 @@ body {
 
 .accordion-header h3 {
     margin: 0;
+}
+
+.accordion-header .category-reps {
+    font-size: 0.9em;
+    color: #555;
 }
 
 .accordion-content {
@@ -91,17 +98,14 @@ body {
     font-size: 0.9em;
 }
 
-.accordion-header .category-reps {
-    font-size: 0.9em;
-    color: #555;
-}
-
 .read-only {
     pointer-events: none;
     opacity: 0.7;
 }
 
-/* Chat Pane Styles */
+
+/* --- Chat Pane Styles --- */
+
 #chat-pane {
     position: fixed;
     right: 0;
@@ -113,7 +117,7 @@ body {
     display: flex;
     flex-direction: column;
     box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
-    z-index: 1000; /* Ensure it's on top */
+    z-index: 1000;
 }
 
 #chat-history {
@@ -128,7 +132,7 @@ body {
     padding: 8px 12px;
     margin-bottom: 8px;
     border-radius: 18px;
-    max-width: 90%; /* Adjusted for better fit */
+    max-width: 90%;
     word-wrap: break-word;
 }
 
@@ -139,74 +143,61 @@ body {
 }
 
 .chat-message.agent {
-    background-color: #e6e6e6; /* Light grey for agent messages */
-    align-self: flex-start; /* Align to the left */
+    background-color: #e6e6e6;
+    align-self: flex-start;
     border-bottom-left-radius: 4px;
 }
 
-.chat-message.audio {
-    background-color: #e0e0e0; /* Different background for audio */
-    align-self: flex-end; /* Assuming user recorded audio */
-}
-
-.chat-message.audio audio {
-    display: block;
-    margin-top: 5px;
-    max-width: 100%;
-    height: 40px; /* Consistent height for audio player */
-}
-
-
 #chat-input-area {
     display: flex;
-    flex-direction: column; /* Changed to stack elements vertically */
+    flex-direction: column;
     padding: 10px;
     border-top: 1px solid #ccc;
     background-color: #fff;
 }
 
-.message-controls-row {
+/* --- Chat Input Area Controls --- */
+
+.stream-controls-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 15px; /* row-gap column-gap */
+    margin-bottom: 10px;
+    font-size: 0.9em;
+}
+
+.stream-control {
     display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#vad-controls {
+    display: flex;
+    align-items: center;
     width: 100%;
-    align-items: center;
-    margin-top: 5px; /* Adds a small space if vad-controls has a bottom margin */
+    margin-bottom: 5px;
 }
 
-#chat-message-input {
-    flex-grow: 1; /* Allow input to take available space */
-    padding: 8px;
+#vad-controls span {
+    margin-right: 10px;
+    font-size: 0.8em;
+}
+
+#vu-meter {
+    flex-grow: 1;
+    height: 10px;
+    background-color: #e0e0e0;
     border: 1px solid #ccc;
-    border-radius: 18px;
-    margin-right: 5px;
+    border-radius: 5px;
+    overflow: hidden;
 }
 
-#chat-send-button, #chat-mic-button, #chat-delete-session-button {
-    padding: 0;
-    border: none;
-    border-radius: 50%;
-    cursor: pointer;
-    background-color: #007bff;
-    color: white;
-    margin-left: 5px;
-    width: 40px;
-    height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 18px;
-    flex-shrink: 0; /* Prevent buttons from shrinking */
-}
-
-#chat-mic-button.muted {
-    background-color: #6c757d; /* Grey when muted */
-}
-
-#chat-mic-button.recording {
-    background-color: #dc3545; /* Red when streaming is active */
-}
-
-#chat-delete-session-button {
-    background-color: #dc3545; /* Red for a delete action */
+#vu-meter-level {
+    width: 0%;
+    height: 100%;
+    background-color: #4caf50;
+    transition: width 0.05s ease-out;
 }
 
 .mic-gain-control {
@@ -220,7 +211,7 @@ body {
 .mic-gain-control input[type="range"] {
     flex-grow: 1;
     margin-left: 10px;
-    -webkit-appearance: none; /* Override default look */
+    -webkit-appearance: none;
     appearance: none;
     height: 4px;
     background: #d3d3d3;
@@ -249,22 +240,53 @@ body {
     cursor: pointer;
 }
 
-/* --- Style for the new toggle switch --- */
-.stream-control {
+.message-controls-row {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    margin-top: 5px;
+}
+
+#chat-message-input {
+    flex-grow: 1;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 18px;
+    margin-right: 5px;
+}
+
+#chat-send-button, #chat-delete-session-button {
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    background-color: #007bff;
+    color: white;
+    margin-left: 5px;
+    width: 40px;
+    height: 40px;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    margin-bottom: 10px;
-    padding: 5px;
-    background-color: #f0f0f0;
-    border-radius: 5px;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
 }
+
+#chat-delete-session-button {
+    background-color: #dc3545;
+}
+
+.mic-toggle {
+    margin: 0 5px;
+}
+
+/* --- Toggle Switch (Slider) Styles --- */
 
 .switch {
     position: relative;
     display: inline-block;
-    width: 60px;
-    height: 34px;
+    width: 32px;  /* Further reduced size */
+    height: 18px; /* Further reduced size */
 }
 
 .switch input {
@@ -281,19 +303,17 @@ body {
     right: 0;
     bottom: 0;
     background-color: #ccc;
-    -webkit-transition: .4s;
     transition: .4s;
 }
 
 .slider:before {
     position: absolute;
     content: "";
-    height: 26px;
-    width: 26px;
-    left: 4px;
-    bottom: 4px;
+    height: 12px; /* Further reduced size */
+    width: 12px;  /* Further reduced size */
+    left: 3px;    /* Adjusted position */
+    bottom: 3px;  /* Adjusted position */
     background-color: white;
-    -webkit-transition: .4s;
     transition: .4s;
 }
 
@@ -306,14 +326,11 @@ input:focus + .slider {
 }
 
 input:checked + .slider:before {
-    -webkit-transform: translateX(26px);
-    -ms-transform: translateX(26px);
-    transform: translateX(26px);
+    transform: translateX(14px); /* Adjusted travel distance */
 }
 
-/* Rounded sliders */
 .slider.round {
-    border-radius: 34px;
+    border-radius: 18px; /* Adjusted for new height */
 }
 
 .slider.round:before {

@@ -4,11 +4,15 @@ export function initChatModule(coachAgentURL) {
     const chatHistory = document.getElementById('chat-history');
     const chatMessageInput = document.getElementById('chat-message-input');
     const chatSendButton = document.getElementById('chat-send-button');
-    const chatMicButton = document.getElementById('chat-mic-button');
     const chatDeleteSessionButton = document.getElementById('chat-delete-session-button');
     const vuMeterLevel = document.getElementById('vu-meter-level');
     const micGainSlider = document.getElementById('mic-gain-slider');
     const streamToggleSwitch = document.getElementById('stream-toggle-switch');
+    const showTextToggleSwitch = document.getElementById('show-text-toggle-switch');
+    const playAudioToggleSwitch = document.getElementById('play-audio-toggle-switch');
+    const debugModeToggleSwitch = document.getElementById('debug-mode-toggle-switch');
+    const micMuteToggleSwitch = document.getElementById('mic-mute-toggle-switch');
+
 
     // --- State Variables ---
     let audioContext;
@@ -23,7 +27,6 @@ export function initChatModule(coachAgentURL) {
     let currentAudioSource = null;
     let isTearingDown = false;
     let isConnecting = false;
-    // --- NEW: State for the currently streaming agent message element ---
     let currentAgentMessageElement = null;
 
     // --- Constants & Configuration ---
@@ -46,6 +49,11 @@ export function initChatModule(coachAgentURL) {
 
     // --- UI & Helper Functions ---
     function addMessageToChat(text, type = 'user') {
+        // If debug mode is off, don't show system-info messages
+        if (type === 'system-info' && !debugModeToggleSwitch.checked) {
+            return null;
+        }
+
         const messageElement = document.createElement('div');
         messageElement.classList.add('chat-message', type);
         if (type === 'system-error') messageElement.style.color = 'red';
@@ -54,7 +62,6 @@ export function initChatModule(coachAgentURL) {
         messageElement.textContent = text;
         chatHistory.appendChild(messageElement);
         chatHistory.scrollTop = chatHistory.scrollHeight;
-        // --- MODIFIED: Return the created element to allow for updates ---
         return messageElement;
     }
 
@@ -73,11 +80,12 @@ export function initChatModule(coachAgentURL) {
     function setControlsDisabled(disabled) {
         chatMessageInput.disabled = disabled;
         chatSendButton.disabled = disabled;
-        chatMicButton.disabled = disabled;
         micGainSlider.disabled = disabled;
+        micMuteToggleSwitch.disabled = disabled;
+        // showTextToggleSwitch and playAudioToggleSwitch are now always enabled.
     }
 
-    // --- Audio Processing Functions ---
+    // --- Audio Processing Functions (No changes here) ---
     function floatTo16BitPCM(input) {
         const output = new DataView(new ArrayBuffer(input.length * 2));
         for (let i = 0; i < input.length; i++) {
@@ -110,7 +118,7 @@ export function initChatModule(coachAgentURL) {
         return float32Array;
     }
 
-    // --- Audio Playback Queue ---
+    // --- Audio Playback Queue (No changes here) ---
     function stopAndClearAudioQueue() {
         console.log("Interrupting audio playback and clearing queue.");
         audioQueue = [];
@@ -144,30 +152,30 @@ export function initChatModule(coachAgentURL) {
     }
 
     // --- Microphone & UI State ---
-    function updateMicButtonState() {
+    function updateMicMuteToggleState() {
         if (!isStreaming) {
-            chatMicButton.classList.add('muted');
-            chatMicButton.classList.remove('recording');
-            chatMicButton.title = "Connection disabled";
-        } else if (isMuted) {
-            chatMicButton.classList.add('muted');
-            chatMicButton.classList.remove('recording');
-            chatMicButton.title = "Unmute Microphone";
+            micMuteToggleSwitch.checked = false;
+            micMuteToggleSwitch.disabled = true;
         } else {
-            chatMicButton.classList.remove('muted');
-            chatMicButton.classList.add('recording');
-            chatMicButton.title = "Mute Microphone";
+            micMuteToggleSwitch.disabled = false;
+            micMuteToggleSwitch.checked = !isMuted;
         }
     }
 
+    // --- MODIFIED: Added user-facing messages for mic state changes ---
     function toggleMute() {
         if (!isStreaming) {
             console.warn("Cannot toggle mute: not streaming.");
             return;
         }
-        isMuted = !isMuted;
-        updateMicButtonState();
+        isMuted = !micMuteToggleSwitch.checked;
         console.log(`Microphone is now ${isMuted ? 'muted' : 'unmuted'}.`);
+
+        if (isMuted) {
+            addMessageToChat("Mic muted", "system-success");
+        } else {
+            addMessageToChat("Audio connected. You can now speak.", "system-success");
+        }
     }
 
     // --- Core Streaming Logic ---
@@ -240,8 +248,8 @@ export function initChatModule(coachAgentURL) {
                     };
 
                     isStreaming = true;
-                    isMuted = true; // Start muted, will be unmuted by the handler
-                    updateMicButtonState();
+                    isMuted = !micMuteToggleSwitch.checked;
+                    updateMicMuteToggleState();
                     resolve();
                 } catch (err) {
                     addMessageToChat(`Microphone error: ${err.message}`, "system-error");
@@ -250,28 +258,22 @@ export function initChatModule(coachAgentURL) {
                 }
             };
 
-            // --- MODIFIED: Reworked message handler for text streaming ---
             audioStreamSocket.onmessage = (event) => {
                 if (typeof event.data !== 'string') return;
 
                 try {
                     const message = JSON.parse(event.data);
 
-                    // Handle streaming text display
-                    if (message.mime_type === 'text/plain' && message.data) {
+                    if (showTextToggleSwitch.checked && message.mime_type === 'text/plain' && message.data) {
                         if (!currentAgentMessageElement) {
-                            // This is the first text chunk for a new agent turn.
-                            // Create a new message element and store its reference.
                             currentAgentMessageElement = addMessageToChat(message.data, 'agent');
                         } else {
-                            // This is a subsequent chunk, so append to the existing element.
                             currentAgentMessageElement.textContent += message.data;
-                            chatHistory.scrollTop = chatHistory.scrollHeight; // Ensure it stays scrolled down
+                            chatHistory.scrollTop = chatHistory.scrollHeight;
                         }
                     }
 
-                    // Handle audio playback (no changes here)
-                    if (message.mime_type === 'audio/pcm' && message.data) {
+                    if (playAudioToggleSwitch.checked && message.mime_type === 'audio/pcm' && message.data) {
                         const pcm16Buffer = base64ToArrayBuffer(message.data);
                         const float32Audio = pcm16ToFloat(pcm16Buffer);
                         if (float32Audio.length > 0 && !float32Audio.every(s => s === 0)) {
@@ -280,31 +282,28 @@ export function initChatModule(coachAgentURL) {
                         }
                     }
 
-                    // Handle end-of-turn or interruption signals
                     if (message.turn_complete || message.interrupted) {
                         if (message.interrupted) {
-                            addMessageToChat("Agent interrupted.", "system-info");
+                            addMessageToChat("Agent interrupted.", "system-success");
                             stopAndClearAudioQueue();
                         }
                         if (message.turn_complete) {
                             addMessageToChat("Agent turn complete.", "system-info");
                         }
-                        // The turn is over, so we reset the streaming element reference.
-                        // The next text chunk will create a new message element.
                         currentAgentMessageElement = null;
                     }
 
                 } catch (e) {
                     console.error("Error processing received message:", e, "Data:", event.data);
-                    // Reset state on error to prevent broken states
                     currentAgentMessageElement = null;
                 }
             };
 
+            // --- MODIFIED: Changed the unexpected close message to be less alarming and green ---
             audioStreamSocket.onclose = (event) => {
                 const wasManualClose = event.reason === "Client initiated teardown";
                 if (!wasManualClose) {
-                    addMessageToChat(`Streaming stopped unexpectedly. Code: ${event.code}. Please re-enable the connection.`, "system-error");
+                    addMessageToChat("Streaming stopped. Please re-enable the connection.", "system-success");
                 }
                 teardownStreamingPipeline();
             };
@@ -324,30 +323,25 @@ export function initChatModule(coachAgentURL) {
         if (microphoneStream) {
             microphoneStream.getTracks().forEach(track => track.stop());
             microphoneStream = null;
-            console.log("Microphone stream stopped.");
         }
         if (workletNode) {
             workletNode.port.close();
             workletNode.disconnect();
             workletNode = null;
-            console.log("Worklet node disconnected.");
         }
         if (micGainNode) {
             micGainNode.disconnect();
             micGainNode = null;
-            console.log("Gain node disconnected.");
         }
         if (audioStreamSocket) {
             if (audioStreamSocket.readyState === WebSocket.OPEN || audioStreamSocket.readyState === WebSocket.CONNECTING) {
                 audioStreamSocket.close(1000, "Client initiated teardown");
-                console.log("WebSocket connection closed.");
             }
             audioStreamSocket = null;
         }
 
         if (audioContext && audioContext.state !== 'closed') {
             audioContext.close();
-            console.log("AudioContext closed to release hardware.");
         }
         audioContext = null;
 
@@ -355,14 +349,13 @@ export function initChatModule(coachAgentURL) {
 
         isStreaming = false;
         isMuted = true;
-        currentAgentMessageElement = null; // Reset streaming state on teardown
+        currentAgentMessageElement = null;
 
-        // Update UI to reflect disconnected state
         if (streamToggleSwitch.checked) {
             streamToggleSwitch.checked = false;
         }
         setControlsDisabled(true);
-        updateMicButtonState();
+        updateMicMuteToggleState();
         updateVuMeter(null);
 
         console.log("Pipeline teardown complete.");
@@ -376,12 +369,10 @@ export function initChatModule(coachAgentURL) {
             addMessageToChat("Connection is not active.", "system-error");
             return;
         }
-        // --- NEW: When user sends a message, interrupt any ongoing agent speech ---
         if (currentAgentMessageElement) {
-            currentAgentMessageElement = null; // Finalize the previous agent message
+            currentAgentMessageElement = null;
         }
         stopAndClearAudioQueue();
-        // --- END NEW ---
 
         const message = {mime_type: "text/plain", data: messageText};
         try {
@@ -398,10 +389,8 @@ export function initChatModule(coachAgentURL) {
         if (!confirm("Are you sure you want to delete the session and clear chat history? This will disconnect the stream.")) {
             return;
         }
-
         teardownStreamingPipeline();
         await new Promise(resolve => setTimeout(resolve, 100));
-
         try {
             const response = await fetch(`${coachAgentURL}/api/v1/chat`, {method: 'DELETE'});
             if (response.ok) {
@@ -422,34 +411,54 @@ export function initChatModule(coachAgentURL) {
 
         const isEnabled = streamToggleSwitch.checked;
 
-        if (isEnabled) { // User wants to connect
+        if (isEnabled) {
+            if (!showTextToggleSwitch.checked && !playAudioToggleSwitch.checked) {
+                addMessageToChat("Text and Audio outputs were disabled. Re-enabling both for the new session.", "system-info");
+                showTextToggleSwitch.checked = true;
+                playAudioToggleSwitch.checked = true;
+            }
+
             isConnecting = true;
             streamToggleSwitch.disabled = true;
             addMessageToChat("Initializing audio connection...", "system-info");
             try {
                 await setupStreamingPipeline();
                 setControlsDisabled(false);
-                isMuted = false; // Unmute by default on new connection
+
+                // Automatically enable the microphone on connection.
+                isMuted = false;
+                micMuteToggleSwitch.checked = true;
                 console.log("Connection successful. Microphone is now unmuted.");
                 addMessageToChat("Audio connected. You can now speak.", "system-success");
+
             } catch (error) {
                 console.error("Failed to establish connection:", error);
                 addMessageToChat("Connection failed. Please check permissions and refresh.", "system-error");
-                teardownStreamingPipeline(); // Clean up on failure
+                teardownStreamingPipeline();
             } finally {
                 isConnecting = false;
                 streamToggleSwitch.disabled = false;
-                updateMicButtonState();
+                updateMicMuteToggleState();
             }
-        } else { // User wants to disconnect
+        } else {
             addMessageToChat("Disconnecting...", "system-info");
             teardownStreamingPipeline();
         }
     }
 
+    function handleOutputToggleChange() {
+        if (!isStreaming) return;
+
+        if (!showTextToggleSwitch.checked && !playAudioToggleSwitch.checked) {
+            addMessageToChat("Both text and audio outputs are disabled. Disconnecting.", "system-info");
+            streamToggleSwitch.checked = false;
+            handleStreamToggle();
+        }
+    }
+
     // --- Event Listeners ---
     streamToggleSwitch.addEventListener('change', handleStreamToggle);
-    chatMicButton.addEventListener('click', toggleMute);
+    micMuteToggleSwitch.addEventListener('change', toggleMute);
     micGainSlider.addEventListener('input', () => {
         if (micGainNode) micGainNode.gain.value = parseFloat(micGainSlider.value);
     });
@@ -458,6 +467,9 @@ export function initChatModule(coachAgentURL) {
         if (event.key === 'Enter') sendMessage();
     });
     chatDeleteSessionButton.addEventListener('click', handleDeleteSession);
+    showTextToggleSwitch.addEventListener('change', handleOutputToggleChange);
+    playAudioToggleSwitch.addEventListener('change', handleOutputToggleChange);
+
 
     window.addEventListener('beforeunload', () => {
         console.log("Page is unloading. Tearing down the chat streaming pipeline.");
@@ -466,7 +478,7 @@ export function initChatModule(coachAgentURL) {
 
     // --- Initial State ---
     setControlsDisabled(true);
-    updateMicButtonState();
+    updateMicMuteToggleState();
 
     return {addMessageToChat};
 }
