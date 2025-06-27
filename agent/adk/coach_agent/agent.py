@@ -128,7 +128,7 @@ def update_training(plan: dict) -> dict:
       "repetitions": {
         "<CATEGORY_ID>": {
           "<DRILL_ID>": {
-            "repetition": <NUMBER_OF_REPETITIONS>,
+            "repetition": <OPTIONAL_NUMBER_OF_REPETITIONS>,
             "note": "<OPTIONAL_NOTE>"
           },
           ...
@@ -137,6 +137,10 @@ def update_training(plan: dict) -> dict:
       }
     }
     If a whole category must be updated, all the drills of the category can be added in the plan to update
+    The plan can be updated with:
+     - a new repetition value on the drill
+     - a new note on the drill
+     - both a repetition value and note on the drill
 
     Args:
         plan (dict): The updated training plan data.

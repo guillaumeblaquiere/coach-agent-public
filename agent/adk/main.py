@@ -203,6 +203,7 @@ def get_my_app(
                             "interrupted": event.interrupted,
                         }
                         await websocket.send_text(json.dumps(message))
+                        print(f"Received event: {event}")
                         logger.info(f"[AGENT TO CLIENT]: {message}")
                         # We simply continue to the next event. The generator will wait
                         # for the next user input to produce more events.
@@ -226,14 +227,15 @@ def get_my_app(
                             # logger.info(f"[AGENT TO CLIENT]: audio/pcm: {len(audio_data)} bytes.")
                             await websocket.send_text(json.dumps(message))
                             continue
-
-                    if part.text and event.partial:
+                    elif part.text and event.partial:
                         message = {
                             "mime_type": "text/plain",
                             "data": part.text
                         }
                         await websocket.send_text(json.dumps(message))
                         logger.info(f"[AGENT TO CLIENT]: text/plain: {message}")
+                    else:
+                        print(f"Received event: {event}")
             except asyncio.CancelledError:
                 logger.info("send_response task cancelled.")
             except Exception as e:

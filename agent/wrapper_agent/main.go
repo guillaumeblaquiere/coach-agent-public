@@ -575,24 +575,24 @@ func handleChatStream(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			// --- NEW: Debugging log ---
-			if messageType == websocket.TextMessage {
-				var msg map[string]interface{}
-				if json.Unmarshal(p, &msg) == nil {
-					// It's a valid JSON
-					mimeType, _ := msg["mime_type"].(string)
-					data, _ := msg["data"].(string)
-					if mimeType != "audio/pcm" {
-						log.Printf("[PROXY: Client->Agent] Received JSON message. Mime-Type: %s, Data length: %d", mimeType, len(data))
-					}
-				} else {
-					// Not a JSON, or unexpected structure
-					log.Printf("[PROXY: Client->Agent] Received Text message, length: %d", len(p))
-				}
-			} else {
-				log.Printf("[PROXY: Client->Agent] Received Binary message, length: %d", len(p))
-			}
-			// --- END NEW ---
+			/*			// --- NEW: Debugging log ---
+						if messageType == websocket.TextMessage {
+							var msg map[string]interface{}
+							if json.Unmarshal(p, &msg) == nil {
+								// It's a valid JSON
+								mimeType, _ := msg["mime_type"].(string)
+								data, _ := msg["data"].(string)
+								if mimeType != "audio/pcm" {
+									log.Printf("[PROXY: Client->Agent] Received JSON message. Mime-Type: %s, Data length: %d", mimeType, len(data))
+								}
+							} else {
+								// Not a JSON, or unexpected structure
+								log.Printf("[PROXY: Client->Agent] Received Text message, length: %d", len(p))
+							}
+						} else {
+							log.Printf("[PROXY: Client->Agent] Received Binary message, length: %d", len(p))
+						}
+						// --- END NEW ---*/
 
 			if err := agentConn.WriteMessage(messageType, p); err != nil {
 				log.Printf("Write error (client->agent): %v", err)
@@ -606,22 +606,22 @@ func handleChatStream(w http.ResponseWriter, r *http.Request) {
 		defer wg.Done()
 		for {
 			messageType, p, err := agentConn.ReadMessage()
-			// --- NEW: Debugging log ---
-			if messageType == websocket.TextMessage {
-				var msg map[string]interface{}
-				if json.Unmarshal(p, &msg) == nil {
-					// It's a valid JSON
-					mimeType, _ := msg["mime_type"].(string)
-					data, _ := msg["data"].(string)
-					log.Printf("[PROXY: Agent->Client] Received JSON message. Mime-Type: %s, Data length: %d", mimeType, len(data))
-				} else {
-					// Not a JSON, or unexpected structure
-					log.Printf("[PROXY: Agent->Client] Received Text message, length: %d", len(p))
-				}
-			} else {
-				log.Printf("[PROXY: Agent->Client] Received Binary message, length: %d", len(p))
-			}
-			// --- END NEW ---
+			/*			// --- NEW: Debugging log ---
+						if messageType == websocket.TextMessage {
+							var msg map[string]interface{}
+							if json.Unmarshal(p, &msg) == nil {
+								// It's a valid JSON
+								mimeType, _ := msg["mime_type"].(string)
+								data, _ := msg["data"].(string)
+								log.Printf("[PROXY: Agent->Client] Received JSON message. Mime-Type: %s, Data length: %d", mimeType, len(data))
+							} else {
+								// Not a JSON, or unexpected structure
+								log.Printf("[PROXY: Agent->Client] Received Text message, length: %d", len(p))
+							}
+						} else {
+							log.Printf("[PROXY: Agent->Client] Received Binary message, length: %d", len(p))
+						}
+						// --- END NEW ---*/
 
 			if err != nil {
 				log.Printf("Read error (agent->client): %v", err)
