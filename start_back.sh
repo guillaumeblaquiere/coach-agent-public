@@ -1,3 +1,3 @@
 cd coach
-PROJECT_ID=c4-blaquiere-sbx \
+PROJECT_ID=<YOUR_PROJECT_ID> \
 go run .

@@ -137,20 +137,20 @@ func main() {
 	log.Println("Server exiting")
 }
 
-// ConnectionManager gère les connexions WebSocket actives.
+// ConnectionManager manages active WebSocket connections.
 type ConnectionManager struct {
 	connections map[string][]*websocket.Conn
 	mu          sync.Mutex
 }
 
-// NewConnectionManager crée un nouveau gestionnaire de connexions.
+// NewConnectionManager creates a new connection manager.
 func NewConnectionManager() *ConnectionManager {
 	return &ConnectionManager{
 		connections: make(map[string][]*websocket.Conn),
 	}
 }
 
-// Add enregistre une nouvelle connexion pour un utilisateur.
+// Add registers a new connection for a user.
 func (cm *ConnectionManager) Add(userEmail string, conn *websocket.Conn) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
@@ -161,7 +161,7 @@ func (cm *ConnectionManager) Add(userEmail string, conn *websocket.Conn) {
 	log.Printf("WebSocket connection added for user: %s. Conn length is now %d \n", userEmail, len(cm.connections[userEmail]))
 }
 
-// Remove supprime une connexion.
+// Remove deletes a connection.
 func (cm *ConnectionManager) Remove(userEmail string, conn *websocket.Conn) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
@@ -176,14 +176,14 @@ func (cm *ConnectionManager) Remove(userEmail string, conn *websocket.Conn) {
 	}
 }
 
-// WebSocketMessage est la structure pour nos messages.
+// WebSocketMessage is the structure for our messages.
 type WebSocketMessage struct {
 	Action string      `json:"action"`
 	Data   interface{} `json:"data"`
 	Source string      `json:"source"`
 }
 
-// SendMessage envoie un message à un utilisateur spécifique.
+// SendMessage sends a message to a specific user.
 func (cm *ConnectionManager) SendMessage(userEmail string, message WebSocketMessage) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
@@ -204,7 +204,7 @@ func (cm *ConnectionManager) SendMessage(userEmail string, message WebSocketMess
 	for _, conn := range connections {
 		if err := conn.WriteMessage(websocket.TextMessage, jsonData); err != nil {
 			log.Printf("Error sending WebSocket message to %s: %v", userEmail, err)
-			// On pourrait vouloir supprimer la connexion si l'écriture échoue.
+			// We might want to delete the connection if writing fails.
 			conn.Close()
 			// Remove the connection from the list
 			for i, c := range cm.connections[userEmail] {
@@ -220,7 +220,7 @@ func (cm *ConnectionManager) SendMessage(userEmail string, message WebSocketMess
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		// Mettez ici une logique plus stricte pour la production !
+		// Put stricter logic here for production!
 		return true
 	},
 }

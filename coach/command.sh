@@ -1,6 +1,6 @@
 #!/bin/bash
 
-PROJECT_ID=c4-blaquiere-sbx
+PROJECT_ID=<YOUR_PROJECT_ID>
 go run .
 
 #Activate the firestore API
@@ -80,7 +80,7 @@ curl http://localhost:8080/api/v1/daily-plans/today
 #
 # 3. Send the updated plan back to the server:
 curl -X PUT -H "Content-Type: application/json" -d "@updateDrill.json" http://localhost:8080/api/v1/daily-plans/today
-curl -X PUT -H "Content-Type: application/json" -d "@updateDrill.json" http://coach-backend-513069150666.europe-west1.run.app/api/v1/daily-plans/today
+curl -X PUT -H "Content-Type: application/json" -d "@updateDrill.json" http://<YOUR_BACKEND_URL>/api/v1/daily-plans/today
 
 # Health Check
 curl http://localhost:8080/health

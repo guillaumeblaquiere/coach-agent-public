@@ -1,5 +1,5 @@
-projectNumber=513069150666
-projectId=c4-blaquiere-sbx
+projectNumber=<YOUR_PROJECT_NUMBER>
+projectId=<YOUR_PROJECT_ID>
 
 # Create a service account for the agent service
 gcloud iam service-accounts create coach-agent-service-account \
@@ -59,14 +59,14 @@ gcloud beta run deploy coach-agent-wrapper \
   --cpu 1 \
   --image gcr.io/${projectId}/coach-agent-wrapper:latest \
   --port 8081 \
-  --set-env-vars=COACH_AGENT_HOST=localhost,COACH_AGENT_PORT=8000,COACH_AGENT_NAME=coach_agent,COACH_BACKEND_URL=http://coach-backend-${projectNumber}.europe-west1.run.app \
+  --set-env-vars=COACH_AGENT_HOST=localhost,COACH_AGENT_PORT=8000,COACH_AGENT_NAME=coach_agent,COACH_BACKEND_URL=http://<YOUR_BACKEND_URL> \
   --depends-on=adk \
   --container adk \
   --memory 512Mi \
   --cpu 2 \
   --image gcr.io/${projectId}/coach-agent:latest \
   --startup-probe=httpGet.path=/list-apps,httpGet.port=8000,timeoutSeconds=10,periodSeconds=10,failureThreshold=3,initialDelaySeconds=5 \
-  --set-env-vars=GOOGLE_GENAI_USE_VERTEXAI=TRUE,GOOGLE_CLOUD_PROJECT=${projectId},GOOGLE_CLOUD_LOCATION=europe-west1,COACH_BACKEND_URL=http://coach-backend-${projectNumber}.europe-west1.run.app
+  --set-env-vars=GOOGLE_GENAI_USE_VERTEXAI=TRUE,GOOGLE_CLOUD_PROJECT=${projectId},GOOGLE_CLOUD_LOCATION=europe-west1,COACH_BACKEND_URL=http://<YOUR_BACKEND_URL>
 
 # Deploy the frontend service
 gcloud run deploy coach-frontend \
