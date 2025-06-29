@@ -1,7 +1,9 @@
 import requests
 import datetime
 import os
-from zoneinfo import ZoneInfo
+import asyncio # --- NEW: Import for asynchronous operations
+from typing import AsyncGenerator # --- NEW: Import for typing the generator tool
+
 from google.adk.agents import Agent
 from urllib.parse import urljoin
 
@@ -133,7 +135,22 @@ def update_training(plan: dict) -> dict:
     except requests.exceptions.RequestException as e:
         return {"status": "error", "error_message": f"Failed to update training plan: {e}"}
 
+async def start_timer(duration_in_seconds: int) -> str:
+    """
+    Starts a timer for a specified duration.
+    It first yields a confirmation message, waits for the duration without blocking,
+    and then yields a completion message.
 
+    Args:
+        duration_in_seconds (int): The duration of the timer in seconds.
+    """
+    if duration_in_seconds <= 0:
+        yield "La durée doit être supérieure à zéro."
+        return
+
+    yield "C'est parti !"
+    await asyncio.sleep(duration_in_seconds)
+    yield "Terminé !"
 
 root_agent = Agent(
     name="coach_agent",
@@ -145,7 +162,7 @@ root_agent = Agent(
     ),
     # instruction=get_prompt["exp"],
     instruction=get_prompt["working"],
-    tools=[get_daily_achievement, get_training_template, get_date_today, update_training],
+    tools=[get_daily_achievement, get_training_template, get_date_today, update_training, start_timer],
 
 )
 

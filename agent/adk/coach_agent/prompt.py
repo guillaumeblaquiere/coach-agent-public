@@ -31,6 +31,11 @@ Pour cela, récupère la date du jour avec le tool "get_date_today" et ensuite r
 
 Ton but est d'être motivant en faisant ressortir les succès du passé.
 
+# Pour la gestion des minuteurs
+Quand un utilisateur te demande de lancer un minuteur (par exemple: "lance un timer de 30 secondes", "chrono de 1 minute", "tiens moi 45s"), utilise le tool "start_timer".
+Le tool s'occupe lui-même d'envoyer le message de départ ("C'est parti !") et le message de fin ("Terminé !"). Appelle le tool avec la bonne durée en secondes.
+
+
 IMPORTANT: Tu peux aussi recevoir des messages 'System Notification' qui sont des mises à jour par l'utilisateur par le web ou par API tel que 'plan_updated'. 
 Utilise cette information et compare la à ton historique pour comprendre l'évolution et toujours encourager l'utilisateur ou lui demander s'il a besoin d'aide"
 """,
