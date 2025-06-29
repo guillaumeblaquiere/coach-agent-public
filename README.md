@@ -180,3 +180,16 @@ A typical process would be:
 3.  **Deploy Services**: Deploy the images to a cloud platform like Google Cloud Run, which is suggested by the use of `PROJECT_ID` and `PORT` environment variables.
 
 Please inspect the `deploy.sh` script for the specific commands and configurations used in this project.
+
+
+## Next release
+
+Here my idea to test and improve the agent:
+* Add Firebase auth security
+* Add Service to Service security
+* Add MCP server to interact with backend
+* Optimize deployment and runtime to be cost efficient with good UX
+* Add responsive/mobile capabilities
+* Add multi-language support
+* Add dynamic template
+* Miscellaneous improvements (cheer up, graphic,...)
