@@ -1,0 +1,26 @@
+# C:/Users/Guillou/IdeaProjects/coach/build/app.yaml
+
+# Use a lightweight runtime as we are only serving static files.
+# python311 is a good standard choice that doesn't imply a build process.
+runtime: python311
+
+# Service name, as requested.
+service: coach
+
+automatic_scaling:
+  max_instances: 1
+
+handlers:
+  # This handler serves static assets from their specific directories (css, js).
+  # It's important to place this before the general SPA fallback handler.
+  # The regex matches URLs starting with /css/ or /js/.
+  - url: /((css|js)/.+)
+    static_files: \1
+    upload: (css|js)/.+
+
+  # This is the fallback handler for the Single Page Application (SPA).
+  # It serves the index.html for any request that was not matched above.
+  # This includes the root path '/' and any client-side routes like '/some/route'.
+  - url: /.*
+    static_files: index.html
+    upload: index.html
