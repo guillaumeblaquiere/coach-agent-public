@@ -15,13 +15,17 @@ These services are designed to be run as independent microservices.
 
 ```
 [ User ] <--> [ Web Frontend ] <--> [ Coach Backend (Go) ] <--> [ Google Firestore ]
-                         ^                    |
-                         | (WebSocket)        | (HTTP - Service-to-Service)
-                         |                    v
-                         |        [ Agent Wrapper (Go) ]
-                         |                    | (HTTP)
-                         |                    v
-                         +--------> [ Agent ADK (Python/Vertex AI) ]
+                         ^                    |      ^ 
+                         |                    |      | Tools (HTTP)
+                         |                    |      +-------------------------+
+                         |                    |                                |
+                         | (WebSocket)        | (HTTP - Service-to-Service)    |
+                         |                    v                                |
+                         +--------> [ Agent Wrapper (Go) ]                     |
+                                              | (HTTP - session)               |
+                                              | (WebSocket - stream)           |
+                                              v                                |
+                                 [ Agent ADK (Python/Vertex AI) ] <------------+
 ```
 
 ## Technology Stack
