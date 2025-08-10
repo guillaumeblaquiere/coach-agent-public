@@ -1,0 +1,316 @@
+{
+  "id": "",
+  "date": "2025-06-01",
+  "categories": {
+    "back": {
+      "id": "",
+      "name": "Dos",
+      "description": "Etirement des hanches et du dos, position au sol",
+      "drills": {
+        "Abs": {
+          "id": "",
+          "name": "Etirement abdominaux",
+          "description": "Position au allongé face au sol, bras tendu, tête vers le haut",
+          "categoryId": "back",
+          "targetRepetition": 3,
+          "repetition": 3,
+          "createdAt": "2025-06-01T20:11:58.486523Z",
+          "updatedAt": "2025-06-01T20:13:05.139865Z"
+        },
+        "GluteusLeft": {
+          "id": "",
+          "name": "Fessier Gauche",
+          "description": "Position au sol, jambe gauche pliée, la basculer vers la poitrine, jambe droite tendue",
+          "categoryId": "back",
+          "targetRepetition": 3,
+          "createdAt": "2025-06-01T20:11:58.486523Z",
+          "updatedAt": "2025-06-01T20:11:58.486523Z"
+        },
+        "GluteusRight": {
+          "id": "",
+          "name": "Fessier Droit",
+          "description": "Position au sol, jambe droite pliée, la basculer vers la poitrine, jambe gauche tendue",
+          "categoryId": "back",
+          "targetRepetition": 3,
+          "createdAt": "2025-06-01T20:11:58.486523Z",
+          "updatedAt": "2025-06-01T20:11:58.486523Z"
+        },
+        "HipStretchedLeft": {
+          "id": "",
+          "name": "Etirement Hanche Gauche",
+          "description": "Position de fente au sol, jambe gauche pliée sur le coté, jambe droite tendue, genou au sol, bassin basculé à l'avant",
+          "categoryId": "back",
+          "targetRepetition": 3,
+          "createdAt": "2025-06-01T20:11:58.486523Z",
+          "updatedAt": "2025-06-01T20:11:58.486523Z"
+        },
+        "HipStretchedRight": {
+          "id": "",
+          "name": "Etirement Hanche Droit",
+          "description": "Position de fente au sol, jambe droite pliée sur le coté, jambe gauche tendue, genou au sol, bassin basculé à l'avant",
+          "categoryId": "back",
+          "targetRepetition": 3,
+          "createdAt": "2025-06-01T20:11:58.486523Z",
+          "updatedAt": "2025-06-01T20:11:58.486523Z"
+        },
+        "LumbarRotationLeft": {
+          "id": "",
+          "name": "Rotation Lombaire Gauche",
+          "description": "Position au sol, jambe gauche pliée, basculée sur le coté droit, jambe droite tendue, épaules au sol",
+          "categoryId": "back",
+          "targetRepetition": 3,
+          "createdAt": "2025-06-01T20:11:58.486523Z",
+          "updatedAt": "2025-06-01T20:11:58.486523Z"
+        },
+        "LumbarRotationRight": {
+          "id": "",
+          "name": "Rotation Lombaire Droit",
+          "description": "Position au sol, jambe droite pliée, basculée sur le coté gauche, jambe gauche tendue, épaules au sol",
+          "categoryId": "back",
+          "targetRepetition": 3,
+          "createdAt": "2025-06-01T20:11:58.486523Z",
+          "updatedAt": "2025-06-01T20:11:58.486523Z"
+        },
+        "LumbarStretched": {
+          "id": "",
+          "name": "Etirement Lombaire",
+          "description": "Position au sol, genoux sur la poitrine, rouler",
+          "categoryId": "back",
+          "targetRepetition": 3,
+          "createdAt": "2025-06-01T20:11:58.486523Z",
+          "updatedAt": "2025-06-01T20:11:58.486523Z"
+        },
+        "UpperBack": {
+          "id": "",
+          "name": "Etirement haut du dos",
+          "description": "Position au sol, dos arrondit, bras tendus à l'avant",
+          "categoryId": "back",
+          "targetRepetition": 3,
+          "createdAt": "2025-06-01T20:11:58.486523Z",
+          "updatedAt": "2025-06-01T20:11:58.486523Z"
+        }
+      }
+    },
+    "leg": {
+      "id": "",
+      "name": "Jambe",
+      "description": "Etirement bas du corps et des jambes, position assise et debout",
+      "drills": {
+        "AdductorButterfly": {
+          "id": "",
+          "name": "Adducteur papillon",
+          "description": "Etirement des adducteurs, position assise au sol, jambes pliées, plantes des pieds jointes",
+          "categoryId": "leg",
+          "targetRepetition": 3,
+          "createdAt": "2025-06-01T20:11:58.486523Z",
+          "updatedAt": "2025-06-01T20:11:58.486523Z"
+        },
+        "AdductorLeft": {
+          "id": "",
+          "name": "Adducteur gauche",
+          "description": "Etirement de l'adducteur gauche, position assise, jambe gauche pliée, jambe droite tendue",
+          "categoryId": "leg",
+          "targetRepetition": 3,
+          "createdAt": "2025-06-01T20:11:58.486523Z",
+          "updatedAt": "2025-06-01T20:11:58.486523Z"
+        },
+        "AdductorRight": {
+          "id": "",
+          "name": "Adducteur droit",
+          "description": "Etirement de l'adducteur droit, position assise, jambe droite pliée, jambe gauche tendue",
+          "categoryId": "leg",
+          "targetRepetition": 3,
+          "createdAt": "2025-06-01T20:11:58.486523Z",
+          "updatedAt": "2025-06-01T20:11:58.486523Z"
+        },
+        "AdductorSplits": {
+          "id": "",
+          "name": "Adducteur grand écart",
+          "description": "Etirement des adducteurs, position assise au sol, jambes écartées, corps basculé en avant",
+          "categoryId": "leg",
+          "targetRepetition": 3,
+          "createdAt": "2025-06-01T20:11:58.486523Z",
+          "updatedAt": "2025-06-01T20:11:58.486523Z"
+        },
+        "CalfLeft": {
+          "id": "",
+          "name": "Mollet Gauche",
+          "description": "Etirement du mollet gauche, position debout sur une marche",
+          "categoryId": "leg",
+          "targetRepetition": 3,
+          "createdAt": "2025-06-01T20:11:58.486523Z",
+          "updatedAt": "2025-06-01T20:11:58.486523Z"
+        },
+        "CalfRight": {
+          "id": "",
+          "name": "Mollet Droit",
+          "description": "Etirement du mollet droit, position debout sur une marche",
+          "categoryId": "leg",
+          "targetRepetition": 3,
+          "createdAt": "2025-06-01T20:11:58.486523Z",
+          "updatedAt": "2025-06-01T20:11:58.486523Z"
+        },
+        "HamstringBoth": {
+          "id": "",
+          "name": "Ischios",
+          "description": "Etirement des ischios, position assise au sol, jambes tendues, corps basculé en avant",
+          "categoryId": "leg",
+          "targetRepetition": 3,
+          "createdAt": "2025-06-01T20:11:58.486523Z",
+          "updatedAt": "2025-06-01T20:11:58.486523Z"
+        },
+        "HamstringLeft": {
+          "id": "",
+          "name": "Ischio Gauche",
+          "description": "Etirement de l'ischio gauche, position debout la jambe sur-élevée, pointe du pied vers le haut",
+          "categoryId": "leg",
+          "targetRepetition": 3,
+          "createdAt": "2025-06-01T20:11:58.486523Z",
+          "updatedAt": "2025-06-01T20:11:58.486523Z"
+        },
+        "HamstringRight": {
+          "id": "",
+          "name": "Ischio Droit",
+          "description": "Etirement de l'ischio droit, position debout la jambe sur-élevée, pointe du pied vers le haut",
+          "categoryId": "leg",
+          "targetRepetition": 3,
+          "createdAt": "2025-06-01T20:11:58.486523Z",
+          "updatedAt": "2025-06-01T20:11:58.486523Z"
+        },
+        "QuadricepsLeft": {
+          "id": "",
+          "name": "Quadriceps gauche",
+          "description": "Etirement du quadriceps gauche, position debout, jambe pliée arrière",
+          "categoryId": "leg",
+          "targetRepetition": 3,
+          "createdAt": "2025-06-01T20:11:58.486523Z",
+          "updatedAt": "2025-06-01T20:11:58.486523Z"
+        },
+        "QuadricepsRight": {
+          "id": "",
+          "name": "Quadriceps droit",
+          "description": "Etirement du quadriceps droit, position debout, jambe pliée arrière",
+          "categoryId": "leg",
+          "targetRepetition": 3,
+          "createdAt": "2025-06-01T20:11:58.486523Z",
+          "updatedAt": "2025-06-01T20:11:58.486523Z"
+        }
+      }
+    },
+    "neck": {
+      "id": "",
+      "name": "Cou",
+      "description": "Etirement du cou et de la tête",
+      "drills": {
+        "NeckFront": {
+          "id": "",
+          "name": "Cou avant",
+          "description": "Etirement du cou vers l'avant, les deux main sur la tete",
+          "categoryId": "neck",
+          "targetRepetition": 3,
+          "createdAt": "2025-06-01T20:11:58.486523Z",
+          "updatedAt": "2025-06-01T20:11:58.486523Z"
+        },
+        "NeckLeft": {
+          "id": "",
+          "name": "Cou gauche",
+          "description": "Etirement du cou vers la gauche, tete basculée vers la droite, la main droite sur l'oreille gauche",
+          "categoryId": "neck",
+          "targetRepetition": 3,
+          "createdAt": "2025-06-01T20:11:58.486523Z",
+          "updatedAt": "2025-06-01T20:11:58.486523Z"
+        },
+        "NeckRight": {
+          "id": "",
+          "name": "Cou droit",
+          "description": "Etirement du cou vers la droite, tete basculée vers la gauche, la main droite sur l'oreille droite",
+          "categoryId": "neck",
+          "targetRepetition": 3,
+          "createdAt": "2025-06-01T20:11:58.486523Z",
+          "updatedAt": "2025-06-01T20:11:58.486523Z"
+        }
+      }
+    },
+    "shoulder": {
+      "id": "",
+      "name": "Epaule",
+      "description": "Etirement des épaules et triceps",
+      "drills": {
+        "ObliqueLeft": {
+          "id": "",
+          "name": "Oblique gauche",
+          "description": "Etirement de l'oblique gauche, bras gauche le long du corps, bras droit au dessus de la tete, penché vers la gauche",
+          "categoryId": "shoulder",
+          "targetRepetition": 3,
+          "createdAt": "2025-06-01T20:11:58.486523Z",
+          "updatedAt": "2025-06-01T20:11:58.486523Z"
+        },
+        "ObliqueRight": {
+          "id": "",
+          "name": "Oblique droit",
+          "description": "Etirement de l'oblique droit, bras droit le long du corps, bras gauche au dessus de la tete, penché vers la droite",
+          "categoryId": "shoulder",
+          "targetRepetition": 3,
+          "createdAt": "2025-06-01T20:11:58.486523Z",
+          "updatedAt": "2025-06-01T20:11:58.486523Z"
+        },
+        "ShoulderCrossLeft": {
+          "id": "",
+          "name": "Epaule croisée gauche",
+          "description": "Etirement de l'épaule gauche, bras gauche tendu devant soi allant vers la droite, l'autre main tire le bras",
+          "categoryId": "shoulder",
+          "targetRepetition": 3,
+          "createdAt": "2025-06-01T20:11:58.486523Z",
+          "updatedAt": "2025-06-01T20:11:58.486523Z"
+        },
+        "ShoulderCrossLeftBack": {
+          "id": "",
+          "name": "Epaule croisée gauche arrière",
+          "description": "Etirement de l'épaule gauche, bras gauche tendu appuyé sur un montant fixe (porte, poteau) vers l'arrière. Le corps effectue une rotation pour étirer l'épaule",
+          "categoryId": "shoulder",
+          "targetRepetition": 3,
+          "createdAt": "2025-06-01T20:11:58.486523Z",
+          "updatedAt": "2025-06-01T20:11:58.486523Z"
+        },
+        "ShoulderCrossRight": {
+          "id": "",
+          "name": "Epaule croisée droite",
+          "description": "Etirement de l'épaule droite, bras droit tendu devant soi allant vers la gauche, l'autre main tire le bras",
+          "categoryId": "shoulder",
+          "targetRepetition": 3,
+          "createdAt": "2025-06-01T20:11:58.486523Z",
+          "updatedAt": "2025-06-01T20:11:58.486523Z"
+        },
+        "ShoulderCrossRightBack": {
+          "id": "",
+          "name": "Epaule croisée droite arrière",
+          "description": "Etirement de l'épaule droite, bras droit tendu appuyé sur un montant fixe (porte, poteau) vers l'arrière. Le corps effectue une rotation pour étirer l'épaule",
+          "categoryId": "shoulder",
+          "targetRepetition": 3,
+          "createdAt": "2025-06-01T20:11:58.486523Z",
+          "updatedAt": "2025-06-01T20:11:58.486523Z"
+        },
+        "TricepsLeft": {
+          "id": "",
+          "name": "Triceps gauche",
+          "description": "Etirement du triceps gauche, coude au dessus de la tete, l'autre main tire le coude",
+          "categoryId": "shoulder",
+          "targetRepetition": 3,
+          "createdAt": "2025-06-01T20:11:58.486523Z",
+          "updatedAt": "2025-06-01T20:11:58.486523Z"
+        },
+        "TricepsRight": {
+          "id": "",
+          "name": "Triceps droit",
+          "description": "Etirement du triceps droit, coude au dessus de la tete, l'autre main tire le coude",
+          "categoryId": "shoulder",
+          "targetRepetition": 3,
+          "createdAt": "2025-06-01T20:11:58.486523Z",
+          "updatedAt": "2025-06-01T20:11:58.486523Z"
+        }
+      }
+    }
+  },
+  "createdAt": "2025-06-01T20:11:58.486523Z",
+  "updatedAt": "2025-06-01T20:13:05.139865Z"
+}

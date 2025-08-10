@@ -1,0 +1,24 @@
+# C:/Users/Guillou/IdeaProjects/coach/front/app.yaml
+
+# Utilise un runtime léger car nous ne servons que des fichiers statiques.
+# python311 est un bon choix standard qui n'implique pas de processus de build.
+runtime: python311
+
+# Nom du service, changé de "default" à "coach" comme demandé.
+service: coach
+
+automatic_scaling:
+  max_instances: 1
+
+handlers:
+  # Sert tous les fichiers statiques depuis la racine du répertoire de déploiement (le dossier 'front').
+  # Le '.' représente le répertoire où se trouve ce fichier app.yaml.
+  - url: /((css|js)/.+)
+    static_files: \1
+    upload: (css|js)/.+
+
+  # Redirige toutes les requêtes qui ne correspondent pas à un fichier statique
+  # vers index.html pour gérer le routing côté client (typique pour une SPA).
+  - url: /.*
+    static_files: index.html
+    upload: index.html
